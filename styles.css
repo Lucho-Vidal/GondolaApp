@@ -1,0 +1,757 @@
+/* ==========================================================================
+   ChangoCheck — Estilos Mobile First
+   Tema: Dark Mode con Acento Teal (#14B8A6) y Fondo Esmeralda Profundo (#0B1412)
+   ========================================================================== */
+
+:root {
+  --bg-body: #0B1412;
+  --bg-surface: #12211D;
+  --bg-surface-elevated: #172B26;
+  --bg-surface-hover: #1D3630;
+  
+  --primary: #14B8A6;
+  --primary-hover: #0D9488;
+  --primary-glow: rgba(20, 184, 166, 0.25);
+  --primary-subtle: rgba(20, 184, 166, 0.12);
+  
+  --text-main: #F8FAFC;
+  --text-muted: #94A3B8;
+  --text-dim: #64748B;
+  
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-highlight: rgba(20, 184, 166, 0.3);
+  
+  --success: #10B981;
+  --danger: #EF4444;
+  --warning: #F59E0B;
+  
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
+  
+  --shadow-card: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 15px rgba(20, 184, 166, 0.35);
+  
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  
+  /* Accesibilidad táctil estricta: Zonas de toque >= 44px */
+  --touch-target-min: 48px;
+}
+
+/* Reset y caja base */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  font-family: var(--font-family);
+  background-color: var(--bg-body);
+  color: var(--text-main);
+  color-scheme: dark;
+  scroll-behavior: smooth;
+  font-size: 16px;
+}
+
+body {
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  line-height: 1.5;
+  background-color: var(--bg-body);
+}
+
+/* ==========================================================================
+   Header & Barra Superior
+   ========================================================================== */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background-color: rgba(11, 20, 18, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 12px 16px;
+}
+
+.header-content {
+  max-width: 560px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-logo {
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 10px var(--primary-glow);
+}
+
+.brand-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-main);
+  line-height: 1.1;
+}
+
+.brand-subtitle {
+  font-size: 0.72rem;
+  color: var(--primary);
+  font-weight: 500;
+  display: block;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--success);
+  box-shadow: 0 0 8px var(--success);
+}
+
+/* ==========================================================================
+   Contenedor Principal
+   ========================================================================== */
+.app-main {
+  flex: 1;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 16px 16px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ==========================================================================
+   Sección del Escáner (Cámara)
+   ========================================================================== */
+.scanner-section {
+  width: 100%;
+  animation: slideDown 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.scanner-section.hidden {
+  display: none !important;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.scanner-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-highlight);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  box-shadow: var(--shadow-card), var(--shadow-glow);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.scanner-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.scanner-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.scanner-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: 0.05em;
+}
+
+.scanner-instructions {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.btn-icon-close {
+  min-width: 44px;
+  min-height: 44px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--border-subtle);
+  background-color: var(--bg-surface-elevated);
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.btn-icon-close:hover, .btn-icon-close:active {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+/* Visor html5-qrcode */
+.scanner-viewport {
+  width: 100%;
+  min-height: 260px;
+  background-color: #000;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  position: relative;
+  border: 2px dashed var(--primary);
+}
+
+/* Adaptación interna de elementos generados por html5-qrcode */
+#reader video {
+  width: 100% !important;
+  height: auto !important;
+  max-height: 320px;
+  object-fit: cover !important;
+  border-radius: var(--radius-md);
+}
+
+#reader__scan_region {
+  border-radius: var(--radius-md) !important;
+}
+
+#reader__dashboard {
+  background: transparent !important;
+  padding: 8px 0 !important;
+}
+
+.scanner-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ==========================================================================
+   Formulario de Registro
+   ========================================================================== */
+.form-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.section-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text-main);
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.required {
+  color: var(--primary);
+}
+
+/* Inputs y Selects táctiles (> 44px) */
+.form-input, .form-select {
+  height: var(--touch-target-min);
+  min-height: var(--touch-target-min);
+  padding: 0 14px;
+  background-color: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-main);
+  font-family: inherit;
+  font-size: 1rem;
+  outline: none;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.form-input::placeholder {
+  color: var(--text-dim);
+  font-size: 0.92rem;
+}
+
+.form-input:focus, .form-select:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--primary-subtle);
+  background-color: var(--bg-surface-hover);
+}
+
+/* Input de código de barras con botón adjunto */
+.input-with-action {
+  display: flex;
+  gap: 8px;
+}
+
+.input-with-action .form-input {
+  flex: 1;
+}
+
+/* Botón de Escanear */
+.btn-scan {
+  height: var(--touch-target-min);
+  min-height: var(--touch-target-min);
+  padding: 0 16px;
+  background-color: var(--primary-subtle);
+  border: 1px solid var(--border-highlight);
+  color: var(--primary);
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.btn-scan:hover, .btn-scan:active {
+  background-color: var(--primary);
+  color: #04241E;
+}
+
+.scan-icon {
+  width: 20px;
+  height: 20px;
+}
+
+/* Grid de Precios y Unidades */
+.form-row-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+}
+
+@media (max-width: 360px) {
+  .form-row-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .form-row-grid .form-group:last-child {
+    grid-column: span 2;
+  }
+}
+
+/* Preview de Precio Unitario */
+.unit-price-preview {
+  background-color: var(--bg-surface-elevated);
+  border: 1px dashed var(--border-highlight);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.preview-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.preview-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+/* Botones Principales */
+.btn-primary {
+  height: var(--touch-target-min);
+  min-height: var(--touch-target-min);
+  background-color: var(--primary);
+  color: #04241E;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  box-shadow: 0 4px 14px var(--primary-glow);
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.btn-primary:hover, .btn-primary:active {
+  background-color: var(--primary-hover);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  height: var(--touch-target-min);
+  min-height: var(--touch-target-min);
+  background-color: var(--bg-surface-elevated);
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-secondary:hover, .btn-secondary:active {
+  background-color: var(--bg-surface-hover);
+  color: var(--text-main);
+}
+
+.save-icon {
+  width: 20px;
+  height: 20px;
+}
+
+/* ==========================================================================
+   Listado y Buscador
+   ========================================================================== */
+.list-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.count-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  color: var(--primary);
+}
+
+.search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-icon {
+  position: absolute;
+  left: 14px;
+  width: 18px;
+  height: 18px;
+  color: var(--text-dim);
+  pointer-events: none;
+}
+
+.search-input {
+  width: 100%;
+  height: var(--touch-target-min);
+  min-height: var(--touch-target-min);
+  padding-left: 42px;
+  padding-right: 14px;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-main);
+  font-family: inherit;
+  font-size: 0.95rem;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.search-input:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--primary-subtle);
+  background-color: var(--bg-surface-hover);
+}
+
+/* Empty State */
+.empty-state {
+  background-color: var(--bg-surface);
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 32px 20px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.empty-icon {
+  font-size: 2.2rem;
+  margin-bottom: 4px;
+}
+
+.empty-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.empty-desc {
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  max-width: 280px;
+}
+
+/* ==========================================================================
+   Toast Notifications
+   ========================================================================== */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: var(--bg-surface-elevated);
+  color: var(--text-main);
+  border: 1px solid var(--border-highlight);
+  padding: 12px 20px;
+  border-radius: var(--radius-full);
+  font-size: 0.9rem;
+  font-weight: 500;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6), 0 0 10px var(--primary-glow);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: toastIn 0.2s ease-out;
+  max-width: 90vw;
+  text-align: center;
+}
+
+.toast.hidden {
+  display: none !important;
+}
+
+.toast.toast-success {
+  border-color: var(--success);
+  color: #A7F3D0;
+}
+
+.toast.toast-error {
+  border-color: var(--danger);
+  color: #FECACA;
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 15px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+/* ==========================================================================
+   Tarjetas de Precios Registrados
+   ========================================================================== */
+.price-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.price-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: var(--shadow-card);
+  transition: all 0.2s ease;
+  animation: cardFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes cardFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.price-card:hover {
+  border-color: var(--border-highlight);
+  background-color: var(--bg-surface-elevated);
+}
+
+.price-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.price-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.price-card-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-main);
+  line-height: 1.3;
+}
+
+.price-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.badge-comercio {
+  font-size: 0.72rem;
+  font-weight: 600;
+  background-color: var(--primary-subtle);
+  color: var(--primary);
+  border: 1px solid var(--border-highlight);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+.badge-codigo {
+  font-size: 0.72rem;
+  font-family: monospace;
+  background-color: var(--bg-body);
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+.btn-delete-item {
+  min-width: 44px;
+  min-height: 44px;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.btn-delete-item:hover, .btn-delete-item:active {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: var(--danger);
+}
+
+.btn-delete-item svg {
+  width: 18px;
+  height: 18px;
+}
+
+.price-card-pricing {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.price-total-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.price-total-number {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--text-main);
+  letter-spacing: -0.02em;
+}
+
+.price-qty-text {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.price-unit-tag {
+  background-color: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #34D399;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: var(--radius-md);
+  white-space: nowrap;
+}
+
+.price-card-date {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+}
+

@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#14B8A6">
+  <meta name="description" content="Carga y compará precios de góndola escaneando códigos de barras.">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <title>ChangoCheck — Precios de Góndola</title>
+</head>
+<body>
+  <!-- Header principal -->
+  <header class="app-header">
+    <div class="header-content">
+      <div class="brand">
+        <img src="icons/icon-192.png" alt="ChangoCheck Logo" class="brand-logo" width="36" height="36">
+        <div class="brand-text">
+          <h1 class="brand-title">ChangoCheck</h1>
+          <span class="brand-subtitle">Comparador de góndola</span>
+        </div>
+      </div>
+      <div class="status-badge" id="status-badge" title="Estado de la aplicación">
+        <span class="status-dot"></span>
+        <span class="status-label" id="status-label">Online</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <!-- Contenedor del Visor de Cámara (Oculto por defecto) -->
+    <section class="scanner-section hidden" id="scanner-section" aria-label="Visor de escaneo">
+      <div class="scanner-card">
+        <div class="scanner-header">
+          <div class="scanner-title-wrap">
+            <span class="scanner-live-badge">EN VIVO</span>
+            <p class="scanner-instructions">Apuntá al código de barras del producto</p>
+          </div>
+          <button type="button" class="btn-icon-close" id="btn-cerrar-escaner" aria-label="Cerrar cámara">
+            ✕
+          </button>
+        </div>
+        
+        <!-- Elemento destino para html5-qrcode -->
+        <div id="reader" class="scanner-viewport"></div>
+
+        <div class="scanner-footer">
+          <button type="button" class="btn-secondary" id="btn-cancelar-escaner">
+            Cancelar escaneo
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Formulario de Registro de Precios -->
+    <section class="form-section">
+      <form class="price-form" id="form-precio" autocomplete="off" novalidate>
+        <div class="form-card">
+          <h2 class="section-title">Registrar Precio</h2>
+
+          <!-- Campo Código de Barras con Botón de Escaneo -->
+          <div class="form-group">
+            <label for="codigo-barra" class="form-label">Código de Barras</label>
+            <div class="input-with-action">
+              <input 
+                type="text" 
+                id="codigo-barra" 
+                name="codigo_barra" 
+                class="form-input" 
+                inputmode="numeric" 
+                pattern="[0-9]*"
+                placeholder="Escaneá o ingresá el código"
+                maxlength="64"
+              >
+              <button 
+                type="button" 
+                class="btn-scan" 
+                id="btn-toggle-scan" 
+                aria-label="Escanear con cámara"
+              >
+                <svg class="scan-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 7V5a2 2 0 0 1 2-2h2"></path>
+                  <path d="M17 3h2a2 2 0 0 1 2 2v2"></path>
+                  <path d="M21 17v2a2 2 0 0 1-2 2h-2"></path>
+                  <path d="M7 21H5a2 2 0 0 1-2-2v-2"></path>
+                  <line x1="7" y1="12" x2="17" y2="12"></line>
+                </svg>
+                <span id="btn-scan-text">Escanear</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Comercio -->
+          <div class="form-group">
+            <label for="comercio" class="form-label">Comercio / Sucursal <span class="required">*</span></label>
+            <input 
+              type="text" 
+              id="comercio" 
+              name="comercio" 
+              class="form-input" 
+              placeholder="Ej: Coto, Carrefour, ChangoMás..." 
+              maxlength="80"
+              required
+            >
+          </div>
+
+          <!-- Producto -->
+          <div class="form-group">
+            <label for="producto" class="form-label">Producto <span class="required">*</span></label>
+            <input 
+              type="text" 
+              id="producto" 
+              name="producto" 
+              class="form-input" 
+              placeholder="Ej: Yerba Mate Playadito 1 kg" 
+              maxlength="150"
+              required
+            >
+          </div>
+
+          <!-- Grid: Precio Total, Cantidad y Unidad -->
+          <div class="form-row-grid">
+            <div class="form-group">
+              <label for="precio-total" class="form-label">Precio ($) <span class="required">*</span></label>
+              <input 
+                type="number" 
+                id="precio-total" 
+                name="precio_total" 
+                class="form-input input-numeric" 
+                inputmode="decimal" 
+                step="0.01" 
+                min="0.01" 
+                placeholder="0.00" 
+                required
+              >
+            </div>
+
+            <div class="form-group">
+              <label for="cantidad" class="form-label">Cantidad <span class="required">*</span></label>
+              <input 
+                type="number" 
+                id="cantidad" 
+                name="cantidad" 
+                class="form-input input-numeric" 
+                inputmode="decimal" 
+                step="0.001" 
+                min="0.001" 
+                value="1" 
+                required
+              >
+            </div>
+
+            <div class="form-group">
+              <label for="unidad" class="form-label">Unidad <span class="required">*</span></label>
+              <select id="unidad" name="unidad" class="form-select" required>
+                <option value="un">un (unidad)</option>
+                <option value="kg">kg (kilos)</option>
+                <option value="g">g (gramos)</option>
+                <option value="l">l (litros)</option>
+                <option value="ml">ml (mililitros)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Tarjeta de Cálculo Unitario Preview -->
+          <div class="unit-price-preview" id="unit-price-box">
+            <span class="preview-label">Precio unitario normalizado:</span>
+            <span class="preview-value" id="precio-unitario-val">—</span>
+          </div>
+
+          <!-- Botón de Guardar -->
+          <button type="submit" class="btn-primary" id="btn-guardar">
+            <svg class="save-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+              <polyline points="17 21 17 13 7 13 7 21"></polyline>
+              <polyline points="7 3 7 8 15 8"></polyline>
+            </svg>
+            <span>Guardar Precio</span>
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Buscador y Listado de Precios -->
+    <section class="list-section">
+      <div class="list-header">
+        <h2 class="section-title">Precios en Góndola</h2>
+        <span class="count-badge" id="precios-count">0 registros</span>
+      </div>
+
+      <!-- Buscador -->
+      <div class="search-box">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input 
+          type="search" 
+          id="input-buscar" 
+          class="search-input" 
+          placeholder="Buscar producto, código o súper..."
+          aria-label="Buscar productos registrados"
+        >
+      </div>
+
+      <!-- Contenedor del listado -->
+      <div class="price-cards-list" id="lista-precios">
+        <div class="empty-state" id="empty-state">
+          <div class="empty-icon">🛒</div>
+          <p class="empty-title">Sin precios registrados</p>
+          <p class="empty-desc">Escaneá un código de barras o completá el formulario para comparar precios al instante.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Toast de Notificaciones -->
+  <div class="toast hidden" id="toast" role="alert" aria-live="assertive"></div>
+
+  <!-- html5-qrcode Library desde CDN (T-04) -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+  <!-- PWA Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then((reg) => console.log('SW registrado con éxito:', reg.scope))
+          .catch((err) => console.error('Error al registrar SW:', err));
+      });
+    }
+  </script>
+
+  <!-- Lógica Principal -->
+  <script type="module" src="app.js"></script>
+</body>
+</html>
