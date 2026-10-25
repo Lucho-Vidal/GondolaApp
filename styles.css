@@ -686,6 +686,16 @@ body {
   border-radius: var(--radius-full);
 }
 
+.badge-autor {
+  font-size: 0.72rem;
+  font-weight: 600;
+  background-color: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
 .btn-delete-item {
   min-width: 44px;
   min-height: 44px;
@@ -1460,6 +1470,238 @@ body {
   align-items: center;
   gap: 8px;
 }
+
+/* ==========================================================================
+   Header Acciones y Autenticación
+   ========================================================================== */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.auth-profile-wrap {
+  display: flex;
+  align-items: center;
+}
+
+.btn-auth-login {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: var(--primary-subtle);
+  color: var(--primary);
+  border: 1px solid var(--border-highlight);
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-height: 32px;
+}
+
+.btn-auth-login:hover {
+  background-color: var(--primary);
+  color: #04241E;
+}
+
+.auth-icon-svg {
+  width: 15px;
+  height: 15px;
+}
+
+.user-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  padding: 3px 8px 3px 4px;
+  border-radius: var(--radius-full);
+  font-size: 0.78rem;
+}
+
+.user-avatar-box {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  overflow: hidden;
+  background-color: var(--bg-surface-elevated);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+}
+
+.user-avatar-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.user-name-label {
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  color: var(--text-main);
+}
+
+.btn-icon-logout {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: color 0.2s;
+}
+
+.btn-icon-logout svg {
+  width: 14px;
+  height: 14px;
+}
+
+.btn-icon-logout:hover {
+  color: var(--danger);
+}
+
+/* ==========================================================================
+   Modal de Autenticación (Google, Facebook, Email)
+   ========================================================================== */
+.auth-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: fadeIn 0.2s ease;
+}
+
+.auth-modal-backdrop.hidden {
+  display: none !important;
+}
+
+.auth-modal-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  animation: scaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+.auth-modal-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.auth-modal-desc {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+  text-align: center;
+}
+
+.auth-providers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.btn-social {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-family: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-social-google {
+  background-color: #ffffff;
+  color: #1f2937;
+}
+
+.btn-social-google:hover {
+  background-color: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.btn-social-facebook {
+  background-color: #1877F2;
+  color: #ffffff;
+  border-color: #1877F2;
+}
+
+.btn-social-facebook:hover {
+  background-color: #166fe5;
+}
+
+.social-svg-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  margin: 4px 0;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.auth-divider span {
+  padding: 0 10px;
+}
+
+.auth-email-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.btn-block {
+  width: 100%;
+}
+
+.auth-footer-note {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  text-align: center;
+  margin: 0;
+}
+
 
 
 

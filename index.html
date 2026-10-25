@@ -26,9 +26,33 @@
           <span class="brand-subtitle">Comparador de góndola</span>
         </div>
       </div>
-      <div class="status-badge" id="status-badge" title="Estado de la sincronización">
-        <span class="status-dot"></span>
-        <span class="status-label" id="status-label">Online</span>
+      <div class="header-right">
+        <div class="status-badge" id="status-badge" title="Estado de la sincronización">
+          <span class="status-dot"></span>
+          <span class="status-label" id="status-label">Online</span>
+        </div>
+        <div class="auth-profile-wrap" id="auth-profile-wrap">
+          <button type="button" class="btn-auth-login" id="btn-login-open" title="Iniciar sesión">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="auth-icon-svg">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+            <span class="login-text">Ingresar</span>
+          </button>
+          <div class="user-pill hidden" id="user-pill" title="Sesión activa">
+            <div class="user-avatar-box" id="user-avatar-box">
+              <span id="user-avatar-fallback">👤</span>
+            </div>
+            <span class="user-name-label" id="user-name-label">Usuario</span>
+            <button type="button" class="btn-icon-logout" id="btn-logout" title="Cerrar sesión" aria-label="Cerrar sesión">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                <polyline points="16 17 21 12 16 7"></polyline>
+                <line x1="21" y1="12" x2="9" y2="12"></line>
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </header>
@@ -392,6 +416,64 @@
             <button type="submit" class="btn-primary" id="btn-guardar-comercio">Guardar Comercio</button>
           </div>
         </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Autenticación / Inicio de Sesión -->
+  <div class="auth-modal-backdrop hidden" id="modal-auth-backdrop">
+    <div class="auth-modal-card" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
+      <div class="modal-comercio-header">
+        <h2 class="modal-comercio-title" id="auth-modal-title">Iniciar Sesión</h2>
+        <button type="button" class="btn-icon-close" id="btn-cerrar-auth" aria-label="Cerrar ventana">✕</button>
+      </div>
+      <div class="auth-modal-body">
+        <p class="auth-modal-desc">
+          Iniciá sesión para registrar precios en góndola, editar tus registros y ayudar a la comunidad a ahorrar.
+        </p>
+
+        <div class="auth-providers-list">
+          <button type="button" class="btn-social btn-social-google" id="btn-auth-google">
+            <svg class="social-svg-icon" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
+              <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.36 24 12 24z"/>
+              <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.17 0 9.99 0 12s.45 3.83 1.25 5.42l4.03-3.15z"/>
+              <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.36 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+            </svg>
+            <span>Continuar con Google</span>
+          </button>
+
+          <button type="button" class="btn-social btn-social-facebook" id="btn-auth-facebook">
+            <svg class="social-svg-icon" viewBox="0 0 24 24" fill="#1877F2">
+              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+            </svg>
+            <span>Continuar con Facebook</span>
+          </button>
+        </div>
+
+        <div class="auth-divider">
+          <span>O ingresá con tu correo</span>
+        </div>
+
+        <form class="auth-email-form" id="form-auth-email">
+          <div class="form-group">
+            <input 
+              type="email" 
+              id="input-auth-email" 
+              class="form-input" 
+              placeholder="tuemail@ejemplo.com" 
+              required
+              autocomplete="email"
+            />
+          </div>
+          <button type="submit" class="btn-primary btn-block" id="btn-auth-magiclink">
+            Enviar enlace de acceso mágico ✨
+          </button>
+        </form>
+
+        <p class="auth-footer-note">
+          No necesitás recordar contraseñas. Te enviaremos un enlace directo a tu casilla.
+        </p>
       </div>
     </div>
   </div>

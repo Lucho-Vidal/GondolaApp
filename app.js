@@ -25,6 +25,155 @@ try {
 }
 
 /* ==========================================================================
+   Gestión de Autenticación (Google, Facebook, Email) y Propiedad
+   ========================================================================== */
+export let usuarioActual = null;
+const LOCAL_STORAGE_MY_PRICES = 'changocheck_my_prices_ids';
+
+let misPreciosLocales = new Set();
+try {
+  const guardados = JSON.parse(localStorage.getItem(LOCAL_STORAGE_MY_PRICES) || '[]');
+  misPreciosLocales = new Set(guardados.map(String));
+} catch (e) {}
+
+export function registrarIdComoPropio(id) {
+  if (!id) return;
+  misPreciosLocales.add(String(id));
+  try {
+    localStorage.setItem(LOCAL_STORAGE_MY_PRICES, JSON.stringify([...misPreciosLocales]));
+  } catch (e) {}
+}
+
+export function removerIdDePropios(id) {
+  if (!id) return;
+  misPreciosLocales.delete(String(id));
+  try {
+    localStorage.setItem(LOCAL_STORAGE_MY_PRICES, JSON.stringify([...misPreciosLocales]));
+  } catch (e) {}
+}
+
+/**
+ * Inicializa y escucha la sesión del usuario con Supabase Auth.
+ */
+export async function inicializarSesion() {
+  if (!supabase) return null;
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    usuarioActual = session?.user || null;
+    actualizarUIUsuario();
+
+    // Escuchar cambios de sesión (cuando el usuario regresa del redirect de Google o Facebook)
+    supabase.auth.onAuthStateChange((_event, session) => {
+      usuarioActual = session?.user || null;
+      actualizarUIUsuario();
+      renderizarDashboard();
+    });
+
+    return usuarioActual;
+  } catch (err) {
+    console.warn('Error obteniendo sesión de Supabase:', err);
+    return null;
+  }
+}
+
+export function abrirModalAuth() {
+  modalAuthBackdrop?.classList.remove('hidden');
+}
+
+export function cerrarModalAuth() {
+  modalAuthBackdrop?.classList.add('hidden');
+}
+
+export function actualizarUIUsuario() {
+  if (usuarioActual) {
+    btnLoginOpen?.classList.add('hidden');
+    userPill?.classList.remove('hidden');
+
+    const meta = usuarioActual.user_metadata || {};
+    const nombre = meta.full_name || meta.name || usuarioActual.email?.split('@')[0] || 'Mi Perfil';
+    if (userNameLabel) userNameLabel.textContent = nombre;
+
+    const avatarUrl = meta.avatar_url || meta.picture;
+    if (userAvatarBox) {
+      if (avatarUrl) {
+        userAvatarBox.innerHTML = `<img src="${avatarUrl}" alt="${escapeHTML(nombre)}" referrerpolicy="no-referrer">`;
+      } else {
+        userAvatarBox.innerHTML = `<span>${escapeHTML(nombre.charAt(0).toUpperCase())}</span>`;
+      }
+    }
+  } else {
+    btnLoginOpen?.classList.remove('hidden');
+    userPill?.classList.add('hidden');
+  }
+}
+
+export async function iniciarSesionOAuth(provider) {
+  if (!supabase) {
+    mostrarToast('Supabase no está conectado.', 'error');
+    return;
+  }
+  try {
+    const redirectUrl = window.location.origin + window.location.pathname;
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: redirectUrl
+      }
+    });
+    if (error) throw error;
+  } catch (err) {
+    console.error(`Error de autenticación con ${provider}:`, err);
+    mostrarToast(`Error al iniciar con ${provider}: ${err.message}`, 'error');
+  }
+}
+
+export async function iniciarSesionEmail(e) {
+  e?.preventDefault();
+  const email = inputAuthEmail?.value.trim();
+  if (!email) {
+    mostrarToast('Por favor ingresá un correo válido.', 'error');
+    return;
+  }
+
+  if (!supabase) {
+    mostrarToast('Supabase no está conectado.', 'error');
+    return;
+  }
+
+  try {
+    const redirectUrl = window.location.origin + window.location.pathname;
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: redirectUrl
+      }
+    });
+
+    if (error) throw error;
+    cerrarModalAuth();
+    if (inputAuthEmail) inputAuthEmail.value = '';
+    mostrarToast('¡Enlace de acceso enviado! Revisá tu correo.', 'success');
+  } catch (err) {
+    console.error('Error enviando enlace OTP:', err);
+    mostrarToast(`No se pudo enviar el enlace: ${err.message}`, 'error');
+  }
+}
+
+export async function cerrarSesion() {
+  try {
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
+    usuarioActual = null;
+    actualizarUIUsuario();
+    renderizarDashboard();
+    mostrarToast('Sesión cerrada.', 'info');
+  } catch (err) {
+    console.error('Error cerrando sesión:', err);
+  }
+}
+
+/* ==========================================================================
    Estado de la Aplicación en Memoria y LocalStorage
    ========================================================================== */
 export let listaPrecios = [];
@@ -53,6 +202,20 @@ const COMERCIOS_DEFAULT = [
 const statusLabel = document.getElementById('status-label');
 const statusBadge = document.getElementById('status-badge');
 const toastEl = document.getElementById('toast');
+
+// Autenticación en Header y Modal
+const btnLoginOpen = document.getElementById('btn-login-open');
+const userPill = document.getElementById('user-pill');
+const userAvatarBox = document.getElementById('user-avatar-box');
+const userNameLabel = document.getElementById('user-name-label');
+const btnLogout = document.getElementById('btn-logout');
+
+const modalAuthBackdrop = document.getElementById('modal-auth-backdrop');
+const btnCerrarAuth = document.getElementById('btn-cerrar-auth');
+const btnAuthGoogle = document.getElementById('btn-auth-google');
+const btnAuthFacebook = document.getElementById('btn-auth-facebook');
+const formAuthEmail = document.getElementById('form-auth-email');
+const inputAuthEmail = document.getElementById('input-auth-email');
 
 // Banner y KPIs
 const btnBannerScan = document.getElementById('btn-banner-scan');
@@ -282,6 +445,12 @@ export async function guardarComercio(e) {
     return;
   }
 
+  if (!usuarioActual) {
+    mostrarToast('Iniciá sesión para dar de alta o editar comercios.', 'info');
+    abrirModalAuth();
+    return;
+  }
+
   const datosComercio = { nombre, ubicacion, descripcion };
 
   try {
@@ -296,9 +465,13 @@ export async function guardarComercio(e) {
         if (error) throw error;
       } else {
         // Insertar nuevo comercio
+        const insertPayload = {
+          ...datosComercio,
+          ...(usuarioActual?.id ? { user_id: usuarioActual.id } : {})
+        };
         const { data, error } = await supabase
           .from('comercios')
-          .insert([datosComercio])
+          .insert([insertPayload])
           .select();
 
         if (error) throw error;
@@ -561,6 +734,12 @@ export async function guardarPrecio(e) {
     return;
   }
 
+  if (!usuarioActual) {
+    mostrarToast('Iniciá sesión para registrar precios.', 'info');
+    abrirModalAuth();
+    return;
+  }
+
   const { precioUnitario } = normalizarPrecioUnitario(precioTotal, cantidad, unidad);
 
   const nuevoRegistro = {
@@ -570,7 +749,8 @@ export async function guardarPrecio(e) {
     precio_total: Number(precioTotal.toFixed(2)),
     cantidad: Number(cantidad.toFixed(3)),
     unidad,
-    precio_unitario: precioUnitario
+    precio_unitario: precioUnitario,
+    ...(usuarioActual?.id ? { user_id: usuarioActual.id } : {})
   };
 
   btnGuardar.disabled = true;
@@ -585,6 +765,7 @@ export async function guardarPrecio(e) {
       if (error) throw error;
       mostrarToast('¡Precio registrado en Supabase!', 'success');
       if (data && data[0]) {
+        registrarIdComoPropio(data[0].id);
         agregarOActualizarRegistro(data[0]);
       }
     } else {
@@ -593,6 +774,7 @@ export async function guardarPrecio(e) {
         id: Date.now(),
         created_at: new Date().toISOString()
       };
+      registrarIdComoPropio(simulado.id);
       agregarOActualizarRegistro(simulado);
       mostrarToast('Guardado localmente', 'success');
     }
@@ -651,15 +833,17 @@ export async function eliminarPrecio(id) {
         .eq('id', id);
 
       if (error) throw error;
+      removerIdDePropios(id);
       eliminarRegistroPorId(id);
       mostrarToast('Precio eliminado', 'info');
     } else {
+      removerIdDePropios(id);
       eliminarRegistroPorId(id);
       mostrarToast('Registro eliminado localmente', 'info');
     }
   } catch (err) {
     console.error('Error al eliminar:', err);
-    mostrarToast(`No se pudo eliminar: ${err.message}`, 'error');
+    mostrarToast(`No tenés permisos para eliminar este registro: ${err.message || 'Acceso denegado'}`, 'error');
   }
 }
 
@@ -829,6 +1013,10 @@ export function renderizarListaRecientes() {
     const unidadBase = (item.unidad === 'g' || item.unidad === 'kg') ? 'kg'
       : (item.unidad === 'ml' || item.unidad === 'l') ? 'l' : 'un';
 
+    // Determinar si el registro pertenece al usuario actual para permitir eliminar
+    const esMio = (usuarioActual && item.user_id && item.user_id === usuarioActual.id) ||
+                  misPreciosLocales.has(String(item.id));
+
     return `
       <article class="price-card" data-id="${item.id}">
         <div class="price-card-header">
@@ -837,14 +1025,17 @@ export function renderizarListaRecientes() {
             <div class="price-card-badges">
               <span class="badge-comercio">${escapeHTML(item.comercio)}</span>
               ${item.codigo_barra ? `<span class="badge-codigo">#${escapeHTML(item.codigo_barra)}</span>` : ''}
+              ${esMio ? `<span class="badge-autor" title="Cargado por vos">👤 Mi carga</span>` : ''}
             </div>
           </div>
-          <button type="button" class="btn-delete-item" title="Eliminar registro" data-delete-id="${item.id}">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-            </svg>
-          </button>
+          ${esMio ? `
+            <button type="button" class="btn-delete-item" title="Eliminar registro" data-delete-id="${item.id}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+            </button>
+          ` : ''}
         </div>
         <div class="price-card-pricing">
           <div class="price-total-wrap">
@@ -1078,9 +1269,37 @@ document.addEventListener('DOMContentLoaded', () => {
   // Buscador reactivo
   inputBuscar?.addEventListener('input', () => renderizarDashboard());
 
+  // Eventos de Autenticación
+  btnLoginOpen?.addEventListener('click', abrirModalAuth);
+  btnCerrarAuth?.addEventListener('click', cerrarModalAuth);
+  btnAuthGoogle?.addEventListener('click', () => iniciarSesionOAuth('google'));
+  btnAuthFacebook?.addEventListener('click', () => iniciarSesionOAuth('facebook'));
+  formAuthEmail?.addEventListener('submit', iniciarSesionEmail);
+  btnLogout?.addEventListener('click', cerrarSesion);
+
+  modalAuthBackdrop?.addEventListener('click', (e) => {
+    if (e.target === modalAuthBackdrop) cerrarModalAuth();
+  });
+
   // Apertura y Cierre del Bottom Sheet Modal de Precios
-  btnFabCarga?.addEventListener('click', () => abrirModalCarga(false));
-  btnBannerScan?.addEventListener('click', () => abrirModalCarga(true));
+  btnFabCarga?.addEventListener('click', () => {
+    if (!usuarioActual) {
+      mostrarToast('Iniciá sesión para registrar precios', 'info');
+      abrirModalAuth();
+      return;
+    }
+    abrirModalCarga(false);
+  });
+
+  btnBannerScan?.addEventListener('click', () => {
+    if (!usuarioActual) {
+      mostrarToast('Iniciá sesión para escanear y registrar precios', 'info');
+      abrirModalAuth();
+      return;
+    }
+    abrirModalCarga(true);
+  });
+
   btnCerrarSheet?.addEventListener('click', cerrarModalCarga);
 
   sheetBackdrop?.addEventListener('click', (e) => {
@@ -1117,7 +1336,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // Cerrar con Escape
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-      if (!modalComercioBackdrop?.classList.contains('hidden')) {
+      if (!modalAuthBackdrop?.classList.contains('hidden')) {
+        cerrarModalAuth();
+      } else if (!modalComercioBackdrop?.classList.contains('hidden')) {
         cerrarModalComercio();
       } else if (!sheetBackdrop?.classList.contains('hidden')) {
         cerrarModalCarga();
@@ -1141,8 +1362,10 @@ document.addEventListener('DOMContentLoaded', () => {
     buscarAutocompletadoProducto(e.target.value);
   });
 
-  // Carga inicial y Suscripciones Realtime
-  cargarComerciosIniciales();
-  cargarPreciosIniciales();
-  suscribirRealtime();
+  // Carga inicial, sesión anónima y Suscripciones Realtime
+  inicializarSesion().finally(() => {
+    cargarComerciosIniciales();
+    cargarPreciosIniciales();
+    suscribirRealtime();
+  });
 });
