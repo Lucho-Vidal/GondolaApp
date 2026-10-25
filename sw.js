@@ -1,4 +1,4 @@
-const CACHE_NAME = 'changocheck-shell-v4';
+const CACHE_NAME = 'changocheck-shell-v7';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -47,7 +47,25 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Cache-First para recursos del App Shell y navegación
+  // Para navegaciones (HTML), usar Network-First con fallback a caché offline (CA-08)
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const copy = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          return caches.match('./index.html') || caches.match('./');
+        })
+    );
+    return;
+  }
+
+  // Para assets estáticos (CSS, JS, iconos), usar Cache-First
   event.respondWith(
     caches.match(request).then((cachedResponse) => {
       if (cachedResponse) {
@@ -56,7 +74,6 @@ self.addEventListener('fetch', (event) => {
 
       return fetch(request)
         .then((networkResponse) => {
-          // Solo cachear respuestas exitosas del mismo origen
           if (
             networkResponse &&
             networkResponse.status === 200 &&
@@ -71,10 +88,7 @@ self.addEventListener('fetch', (event) => {
           return networkResponse;
         })
         .catch(() => {
-          // Fallback a index.html en caso de pérdida de conexión durante navegación
-          if (request.mode === 'navigate') {
-            return caches.match('./index.html');
-          }
+          // Si falla un asset y estamos offline, nada adicional
         });
     })
   );

@@ -11,7 +11,7 @@
   <!-- Google Fonts: Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
   <title>ChangoCheck — Precios de Góndola</title>
 </head>
@@ -26,204 +26,380 @@
           <span class="brand-subtitle">Comparador de góndola</span>
         </div>
       </div>
-      <div class="status-badge" id="status-badge" title="Estado de la aplicación">
+      <div class="status-badge" id="status-badge" title="Estado de la sincronización">
         <span class="status-dot"></span>
         <span class="status-label" id="status-label">Online</span>
       </div>
     </div>
   </header>
 
+  <!-- Contenido Principal: Dashboard de Inicio -->
   <main class="app-main">
-    <!-- Contenedor del Visor de Cámara (Oculto por defecto) -->
-    <section class="scanner-section hidden" id="scanner-section" aria-label="Visor de escaneo">
-      <div class="scanner-card">
-        <div class="scanner-header">
-          <div class="scanner-title-wrap">
-            <span class="scanner-live-badge">EN VIVO</span>
-            <p class="scanner-instructions">Apuntá al código de barras del producto</p>
-          </div>
-          <button type="button" class="btn-icon-close" id="btn-cerrar-escaner" aria-label="Cerrar cámara">
-            ✕
-          </button>
+    <!-- Banner de Acción Rápida -->
+    <section class="quick-scan-banner" id="banner-scan-now">
+      <div class="banner-content">
+        <div class="banner-icon-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="banner-svg">
+            <path d="M3 7V5a2 2 0 0 1 2-2h2"></path>
+            <path d="M17 3h2a2 2 0 0 1 2 2v2"></path>
+            <path d="M21 17v2a2 2 0 0 1-2 2h-2"></path>
+            <path d="M7 21H5a2 2 0 0 1-2-2v-2"></path>
+            <line x1="7" y1="12" x2="17" y2="12"></line>
+          </svg>
         </div>
-        
-        <!-- Elemento destino para html5-qrcode -->
-        <div id="reader" class="scanner-viewport"></div>
+        <div class="banner-text">
+          <span class="banner-title">¿Estás frente a la góndola?</span>
+          <span class="banner-sub">Escaneá el código de barras y compará precios</span>
+        </div>
+      </div>
+      <button type="button" class="btn-banner-action" id="btn-banner-scan">
+        <span>Escanear ahora</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="arrow-icon">
+          <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>
+      </button>
+    </section>
 
-        <div class="scanner-footer">
-          <button type="button" class="btn-secondary" id="btn-cancelar-escaner">
-            Cancelar escaneo
-          </button>
+    <!-- Métricas Rápidas / KPIs del Dashboard -->
+    <section class="kpi-grid" aria-label="Métricas de relevamiento">
+      <div class="kpi-card">
+        <span class="kpi-label">Relevados</span>
+        <div class="kpi-value-wrap">
+          <span class="kpi-num" id="kpi-total-precios">0</span>
+          <span class="kpi-icon">🛒</span>
         </div>
+        <span class="kpi-sub">Precios cargados</span>
+      </div>
+
+      <div class="kpi-card">
+        <span class="kpi-label">Comercios</span>
+        <div class="kpi-value-wrap">
+          <span class="kpi-num" id="kpi-total-comercios">0</span>
+          <span class="kpi-icon">🏬</span>
+        </div>
+        <span class="kpi-sub">Sucursales activas</span>
+      </div>
+
+      <div class="kpi-card">
+        <span class="kpi-label">Productos</span>
+        <div class="kpi-value-wrap">
+          <span class="kpi-num" id="kpi-total-productos">0</span>
+          <span class="kpi-icon">🏷️</span>
+        </div>
+        <span class="kpi-sub">Artículos únicos</span>
       </div>
     </section>
 
-    <!-- Formulario de Registro de Precios -->
-    <section class="form-section">
-      <form class="price-form" id="form-precio" autocomplete="off" novalidate>
-        <div class="form-card">
-          <h2 class="section-title">Registrar Precio</h2>
+    <!-- Segmented Control: Píldoras de Vistas -->
+    <section class="views-nav-section">
+      <div class="segmented-control" role="tablist" aria-label="Selección de vista">
+        <button type="button" class="segment-tab active" id="tab-recientes" role="tab" aria-selected="true">
+          🏷️ Recientes
+        </button>
+        <button type="button" class="segment-tab" id="tab-comparador" role="tab" aria-selected="false">
+          🏆 Comparador
+        </button>
+        <button type="button" class="segment-tab" id="tab-comercios" role="tab" aria-selected="false">
+          🏬 Por Comercio
+        </button>
+      </div>
+    </section>
 
-          <!-- Campo Código de Barras con Botón de Escaneo -->
-          <div class="form-group">
-            <label for="codigo-barra" class="form-label">Código de Barras</label>
-            <div class="input-with-action">
-              <input 
-                type="text" 
-                id="codigo-barra" 
-                name="codigo_barra" 
-                class="form-input" 
-                inputmode="numeric" 
-                pattern="[0-9]*"
-                placeholder="Escaneá o ingresá el código"
-                maxlength="64"
-              >
-              <button 
-                type="button" 
-                class="btn-scan" 
-                id="btn-toggle-scan" 
-                aria-label="Escanear con cámara"
-              >
-                <svg class="scan-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M3 7V5a2 2 0 0 1 2-2h2"></path>
-                  <path d="M17 3h2a2 2 0 0 1 2 2v2"></path>
-                  <path d="M21 17v2a2 2 0 0 1-2 2h-2"></path>
-                  <path d="M7 21H5a2 2 0 0 1-2-2v-2"></path>
-                  <line x1="7" y1="12" x2="17" y2="12"></line>
-                </svg>
-                <span id="btn-scan-text">Escanear</span>
+    <!-- Buscador Global del Dashboard -->
+    <div class="search-box">
+      <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+      <input 
+        type="search" 
+        id="input-buscar" 
+        class="search-input" 
+        placeholder="Buscar por producto, comercio o código..."
+        aria-label="Buscar productos registrados"
+      >
+    </div>
+
+    <!-- Contenedores de las 3 Vistas -->
+    <!-- Vista 1: Recientes (Cronológica) -->
+    <section class="dashboard-view active" id="view-recientes" role="tabpanel">
+      <div class="view-header">
+        <h2 class="view-title">Últimos Precios Relevados</h2>
+        <span class="count-badge" id="precios-count">0 registros</span>
+      </div>
+      <div class="price-cards-list" id="lista-precios"></div>
+    </section>
+
+    <!-- Vista 2: Comparador (Ranking por Producto) -->
+    <section class="dashboard-view hidden" id="view-comparador" role="tabpanel">
+      <div class="view-header">
+        <h2 class="view-title">Comparativa de Precios</h2>
+        <span class="count-badge" id="comparador-count">0 productos</span>
+      </div>
+      <div class="comparator-list" id="lista-comparador"></div>
+    </section>
+
+    <!-- Vista 3: Por Comercio (Agrupado por Supermercado) -->
+    <section class="dashboard-view hidden" id="view-comercios" role="tabpanel">
+      <div class="view-header">
+        <div class="view-header-title-wrap">
+          <h2 class="view-title">Precios por Supermercado</h2>
+          <span class="count-badge" id="comercios-count">0 comercios</span>
+        </div>
+        <button type="button" class="btn-action-small" id="btn-nuevo-comercio-tab">
+          + Nuevo Comercio
+        </button>
+      </div>
+      <div class="stores-list" id="lista-comercios"></div>
+    </section>
+  </main>
+
+  <!-- Botón Flotante de Carga (FAB) -->
+  <button type="button" class="btn-fab" id="btn-fab-carga" aria-label="Registrar nuevo precio" title="Cargar precio">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="fab-icon">
+      <line x1="12" y1="5" x2="12" y2="19"></line>
+      <line x1="5" y1="12" x2="19" y2="12"></line>
+    </svg>
+  </button>
+
+  <!-- Bottom Sheet Modal para Carga de Precios y Escaneo -->
+  <div class="sheet-backdrop hidden" id="sheet-backdrop">
+    <div class="sheet-modal" id="sheet-modal" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+      <!-- Indicador táctil de arrastre -->
+      <div class="sheet-drag-handle"></div>
+
+      <div class="sheet-header">
+        <div class="sheet-title-wrap">
+          <h2 class="sheet-title" id="sheet-title">Registrar Precio</h2>
+          <p class="sheet-desc">Ingresá el artículo manualmente o escaneá con la cámara</p>
+        </div>
+        <button type="button" class="btn-sheet-close" id="btn-cerrar-sheet" aria-label="Cerrar ventana">
+          ✕
+        </button>
+      </div>
+
+      <div class="sheet-body">
+        <!-- Visor de Cámara dentro del Modal -->
+        <section class="scanner-section hidden" id="scanner-section" aria-label="Visor de escaneo">
+          <div class="scanner-card">
+            <div class="scanner-header">
+              <div class="scanner-title-wrap">
+                <span class="scanner-live-badge">EN VIVO</span>
+                <p class="scanner-instructions">Apuntá al código de barras del producto</p>
+              </div>
+              <button type="button" class="btn-icon-close" id="btn-cerrar-escaner" aria-label="Cerrar cámara">
+                ✕
+              </button>
+            </div>
+            
+            <div id="reader" class="scanner-viewport"></div>
+
+            <div class="scanner-footer">
+              <button type="button" class="btn-secondary" id="btn-cancelar-escaner">
+                Cancelar escaneo
               </button>
             </div>
           </div>
+        </section>
 
-          <!-- Comercio -->
+        <!-- Formulario de Registro -->
+        <form class="price-form" id="form-precio" autocomplete="off" novalidate>
+          <div class="form-card-modal">
+            <!-- Código de barras -->
+            <div class="form-group">
+              <label for="codigo-barra" class="form-label">Código de Barras</label>
+              <div class="input-with-action">
+                <input 
+                  type="text" 
+                  id="codigo-barra" 
+                  name="codigo_barra" 
+                  class="form-input" 
+                  inputmode="numeric" 
+                  pattern="[0-9]*"
+                  placeholder="Escaneá o ingresá el código"
+                  maxlength="64"
+                >
+                <button 
+                  type="button" 
+                  class="btn-scan" 
+                  id="btn-toggle-scan" 
+                  aria-label="Escanear con cámara"
+                >
+                  <svg class="scan-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 7V5a2 2 0 0 1 2-2h2"></path>
+                    <path d="M17 3h2a2 2 0 0 1 2 2v2"></path>
+                    <path d="M21 17v2a2 2 0 0 1-2 2h-2"></path>
+                    <path d="M7 21H5a2 2 0 0 1-2-2v-2"></path>
+                    <line x1="7" y1="12" x2="17" y2="12"></line>
+                  </svg>
+                  <span id="btn-scan-text">Escanear</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Comercio (Select dinámico editable con opción de agregar nuevo) -->
+            <div class="form-group">
+              <div class="label-with-action">
+                <label for="select-comercio" class="form-label">Comercio / Sucursal <span class="required">*</span></label>
+                <button type="button" class="btn-text-action" id="btn-nuevo-comercio-form" title="Crear nuevo comercio">
+                  + Nuevo
+                </button>
+              </div>
+              <div class="input-with-action">
+                <select id="select-comercio" name="comercio" class="form-select" required>
+                  <option value="" disabled selected>Seleccioná un comercio...</option>
+                </select>
+                <button type="button" class="btn-icon-manage" id="btn-editar-comercio-btn" title="Editar comercio seleccionado" aria-label="Editar comercio">
+                  ✏️
+                </button>
+              </div>
+            </div>
+
+            <!-- Producto -->
+            <div class="form-group">
+              <label for="producto" class="form-label">Producto <span class="required">*</span></label>
+              <input 
+                type="text" 
+                id="producto" 
+                name="producto" 
+                class="form-input" 
+                placeholder="Ej: Yerba Mate Playadito 1 kg" 
+                maxlength="150"
+                required
+              >
+            </div>
+
+            <!-- Precios y Unidades -->
+            <div class="form-row-grid">
+              <div class="form-group">
+                <label for="precio-total" class="form-label">Precio ($) <span class="required">*</span></label>
+                <input 
+                  type="number" 
+                  id="precio-total" 
+                  name="precio_total" 
+                  class="form-input input-numeric" 
+                  inputmode="decimal" 
+                  step="0.01" 
+                  min="0.01" 
+                  placeholder="0.00" 
+                  required
+                >
+              </div>
+
+              <div class="form-group">
+                <label for="cantidad" class="form-label">Cantidad <span class="required">*</span></label>
+                <input 
+                  type="number" 
+                  id="cantidad" 
+                  name="cantidad" 
+                  class="form-input input-numeric" 
+                  inputmode="decimal" 
+                  step="0.001" 
+                  min="0.001" 
+                  value="1" 
+                  required
+                >
+              </div>
+
+              <div class="form-group">
+                <label for="unidad" class="form-label">Unidad <span class="required">*</span></label>
+                <select id="unidad" name="unidad" class="form-select" required>
+                  <option value="un">un (unidad)</option>
+                  <option value="kg">kg (kilos)</option>
+                  <option value="g">g (gramos)</option>
+                  <option value="l">l (litros)</option>
+                  <option value="ml">ml (mililitros)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Preview Precio Unitario -->
+            <div class="unit-price-preview" id="unit-price-box">
+              <span class="preview-label">Precio unitario normalizado:</span>
+              <span class="preview-value" id="precio-unitario-val">—</span>
+            </div>
+
+            <!-- Botón Guardar -->
+            <button type="submit" class="btn-primary" id="btn-guardar">
+              <svg class="save-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                <polyline points="7 3 7 8 15 8"></polyline>
+              </svg>
+              <span>Guardar Precio</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal para Crear / Editar Comercio -->
+  <div class="sheet-backdrop hidden" id="modal-comercio-backdrop">
+    <div class="sheet-modal modal-comercio-card" id="modal-comercio" role="dialog" aria-modal="true" aria-labelledby="modal-comercio-title">
+      <div class="sheet-drag-handle"></div>
+      <div class="sheet-header">
+        <div class="sheet-title-wrap">
+          <h2 class="sheet-title" id="modal-comercio-title">Nuevo Comercio</h2>
+          <p class="sheet-desc">Agregá o modificá los datos del supermercado</p>
+        </div>
+        <button type="button" class="btn-sheet-close" id="btn-cerrar-modal-comercio" aria-label="Cerrar ventana">
+          ✕
+        </button>
+      </div>
+      <div class="sheet-body">
+        <form id="form-comercio" autocomplete="off" novalidate>
+          <input type="hidden" id="comercio-id" name="id">
+
           <div class="form-group">
-            <label for="comercio" class="form-label">Comercio / Sucursal <span class="required">*</span></label>
+            <label for="comercio-nombre" class="form-label">Nombre del Comercio <span class="required">*</span></label>
             <input 
               type="text" 
-              id="comercio" 
-              name="comercio" 
+              id="comercio-nombre" 
+              name="nombre" 
               class="form-input" 
-              placeholder="Ej: Coto, Carrefour, ChangoMás..." 
-              maxlength="80"
+              placeholder="Ej: Coto, Día, ChangoMás..." 
+              maxlength="80" 
               required
             >
           </div>
 
-          <!-- Producto -->
           <div class="form-group">
-            <label for="producto" class="form-label">Producto <span class="required">*</span></label>
+            <label for="comercio-ubicacion" class="form-label">Ubicación / Sucursal</label>
             <input 
               type="text" 
-              id="producto" 
-              name="producto" 
+              id="comercio-ubicacion" 
+              name="ubicacion" 
               class="form-input" 
-              placeholder="Ej: Yerba Mate Playadito 1 kg" 
+              placeholder="Ej: Av. Rivadavia 2000, Sucursal Centro" 
               maxlength="150"
-              required
             >
           </div>
 
-          <!-- Grid: Precio Total, Cantidad y Unidad -->
-          <div class="form-row-grid">
-            <div class="form-group">
-              <label for="precio-total" class="form-label">Precio ($) <span class="required">*</span></label>
-              <input 
-                type="number" 
-                id="precio-total" 
-                name="precio_total" 
-                class="form-input input-numeric" 
-                inputmode="decimal" 
-                step="0.01" 
-                min="0.01" 
-                placeholder="0.00" 
-                required
-              >
-            </div>
-
-            <div class="form-group">
-              <label for="cantidad" class="form-label">Cantidad <span class="required">*</span></label>
-              <input 
-                type="number" 
-                id="cantidad" 
-                name="cantidad" 
-                class="form-input input-numeric" 
-                inputmode="decimal" 
-                step="0.001" 
-                min="0.001" 
-                value="1" 
-                required
-              >
-            </div>
-
-            <div class="form-group">
-              <label for="unidad" class="form-label">Unidad <span class="required">*</span></label>
-              <select id="unidad" name="unidad" class="form-select" required>
-                <option value="un">un (unidad)</option>
-                <option value="kg">kg (kilos)</option>
-                <option value="g">g (gramos)</option>
-                <option value="l">l (litros)</option>
-                <option value="ml">ml (mililitros)</option>
-              </select>
-            </div>
+          <div class="form-group">
+            <label for="comercio-descripcion" class="form-label">Descripción / Promociones</label>
+            <textarea 
+              id="comercio-descripcion" 
+              name="descripcion" 
+              class="form-textarea" 
+              rows="3" 
+              placeholder="Ej: Descuentos con débito los miércoles, abierto hasta 21hs..."
+            ></textarea>
           </div>
 
-          <!-- Tarjeta de Cálculo Unitario Preview -->
-          <div class="unit-price-preview" id="unit-price-box">
-            <span class="preview-label">Precio unitario normalizado:</span>
-            <span class="preview-value" id="precio-unitario-val">—</span>
+          <div class="modal-actions-row">
+            <button type="button" class="btn-secondary" id="btn-cancelar-comercio">Cancelar</button>
+            <button type="submit" class="btn-primary" id="btn-guardar-comercio">Guardar Comercio</button>
           </div>
-
-          <!-- Botón de Guardar -->
-          <button type="submit" class="btn-primary" id="btn-guardar">
-            <svg class="save-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-              <polyline points="17 21 17 13 7 13 7 21"></polyline>
-              <polyline points="7 3 7 8 15 8"></polyline>
-            </svg>
-            <span>Guardar Precio</span>
-          </button>
-        </div>
-      </form>
-    </section>
-
-    <!-- Buscador y Listado de Precios -->
-    <section class="list-section">
-      <div class="list-header">
-        <h2 class="section-title">Precios en Góndola</h2>
-        <span class="count-badge" id="precios-count">0 registros</span>
+        </form>
       </div>
-
-      <!-- Buscador -->
-      <div class="search-box">
-        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="11" cy="11" r="8"></circle>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-        </svg>
-        <input 
-          type="search" 
-          id="input-buscar" 
-          class="search-input" 
-          placeholder="Buscar producto, código o súper..."
-          aria-label="Buscar productos registrados"
-        >
-      </div>
-
-      <!-- Contenedor del listado -->
-      <div class="price-cards-list" id="lista-precios">
-        <div class="empty-state" id="empty-state">
-          <div class="empty-icon">🛒</div>
-          <p class="empty-title">Sin precios registrados</p>
-          <p class="empty-desc">Escaneá un código de barras o completá el formulario para comparar precios al instante.</p>
-        </div>
-      </div>
-    </section>
-  </main>
+    </div>
+  </div>
 
   <!-- Toast de Notificaciones -->
   <div class="toast hidden" id="toast" role="alert" aria-live="assertive"></div>
 
-  <!-- html5-qrcode Library desde CDN (T-04) -->
+  <!-- html5-qrcode Library desde CDN -->
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
   <!-- PWA Service Worker Registration -->
@@ -231,8 +407,8 @@
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js')
-          .then((reg) => console.log('SW registrado con éxito:', reg.scope))
-          .catch((err) => console.error('Error al registrar SW:', err));
+          .then((reg) => console.log('SW registrado:', reg.scope))
+          .catch((err) => console.error('Error SW:', err));
       });
     }
   </script>
