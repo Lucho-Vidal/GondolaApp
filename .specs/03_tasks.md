@@ -1,10 +1,10 @@
 # 03. Plan de Tareas de Implementación (SDD)
 
-- [ ] **T-01: Infraestructura y Base de Datos (Supabase)**
-  - [ ] Crear proyecto en Supabase en región Sudamérica.
-  - [ ] Ejecutar DDL con soporte para `codigo_barra` y unidades.
-  - [ ] Configurar políticas RLS y activar publicación `supabase_realtime`.
-  - [ ] Extraer y documentar `Project URL` y `Anon Key`.
+- [x] **T-01: Infraestructura y Base de Datos (Supabase)**
+  - [x] Crear proyecto en Supabase en región Sudamérica.
+  - [x] Ejecutar DDL con soporte para `codigo_barra` y unidades.
+  - [x] Configurar políticas RLS y activar publicación `supabase_realtime`.
+  - [x] Extraer y documentar `Project URL` y `Anon Key`.
 
 - [x] **T-02: Configuración PWA y Assets Base**
   - [x] Crear archivo `manifest.json` con metadatos de aplicación standalone.
