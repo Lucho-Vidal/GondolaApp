@@ -1,0 +1,11 @@
+# Secretos y credenciales locales (NUNCA subir a GitHub)
+client_secret*.json
+*.pem
+*.key
+.env
+.env.*
+
+# Dependencias y archivos del sistema
+node_modules/
+.DS_Store
+Thumbs.db

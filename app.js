@@ -58,15 +58,32 @@ export function removerIdDePropios(id) {
 export async function inicializarSesion() {
   if (!supabase) return null;
   try {
+    // Verificar si la URL trae errores de redirección OAuth (ej: proveedor desactivado en Supabase)
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const searchParams = new URLSearchParams(window.location.search);
+    const oauthError = hashParams.get('error_description') || searchParams.get('error_description') || hashParams.get('error');
+    if (oauthError) {
+      const msgDecodificado = decodeURIComponent(oauthError.replace(/\+/g, ' '));
+      if (msgDecodificado.toLowerCase().includes('provider is not enabled')) {
+        mostrarToast('Activá ese proveedor en Supabase Dashboard (Authentication → Providers) o ingresá con tu correo.', 'error');
+      } else {
+        mostrarToast(`Error de autenticación: ${msgDecodificado}`, 'error');
+      }
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
     const { data: { session } } = await supabase.auth.getSession();
     usuarioActual = session?.user || null;
     actualizarUIUsuario();
 
     // Escuchar cambios de sesión (cuando el usuario regresa del redirect de Google o Facebook)
-    supabase.auth.onAuthStateChange((_event, session) => {
+    supabase.auth.onAuthStateChange((event, session) => {
       usuarioActual = session?.user || null;
       actualizarUIUsuario();
       renderizarDashboard();
+      if (event === 'SIGNED_IN' && usuarioActual) {
+        cerrarModalAuth();
+      }
     });
 
     return usuarioActual;
@@ -123,15 +140,19 @@ export async function iniciarSesionOAuth(provider) {
     if (error) throw error;
   } catch (err) {
     console.error(`Error de autenticación con ${provider}:`, err);
-    mostrarToast(`Error al iniciar con ${provider}: ${err.message}`, 'error');
+    if (err.message?.toLowerCase().includes('provider is not enabled')) {
+      mostrarToast(`El proveedor ${provider} no está activado aún en Supabase. Podés ingresar con correo y contraseña.`, 'error');
+    } else {
+      mostrarToast(`Error al iniciar con ${provider}: ${err.message}`, 'error');
+    }
   }
 }
 
-export async function iniciarSesionEmail(e) {
-  e?.preventDefault();
+export async function iniciarSesionMagicLink() {
   const email = inputAuthEmail?.value.trim();
   if (!email) {
-    mostrarToast('Por favor ingresá un correo válido.', 'error');
+    mostrarToast('Ingresá tu correo electrónico primero.', 'error');
+    inputAuthEmail?.focus();
     return;
   }
 
@@ -140,6 +161,7 @@ export async function iniciarSesionEmail(e) {
     return;
   }
 
+  if (btnAuthMagicLink) btnAuthMagicLink.disabled = true;
   try {
     const redirectUrl = window.location.origin + window.location.pathname;
     const { error } = await supabase.auth.signInWithOtp({
@@ -152,10 +174,109 @@ export async function iniciarSesionEmail(e) {
     if (error) throw error;
     cerrarModalAuth();
     if (inputAuthEmail) inputAuthEmail.value = '';
-    mostrarToast('¡Enlace de acceso enviado! Revisá tu correo.', 'success');
+    if (inputAuthPassword) inputAuthPassword.value = '';
+    mostrarToast('¡Enlace mágico enviado! Revisá tu bandeja de entrada.', 'success');
   } catch (err) {
     console.error('Error enviando enlace OTP:', err);
     mostrarToast(`No se pudo enviar el enlace: ${err.message}`, 'error');
+  } finally {
+    if (btnAuthMagicLink) btnAuthMagicLink.disabled = false;
+  }
+}
+
+export async function iniciarSesionEmail(e) {
+  e?.preventDefault();
+  const email = inputAuthEmail?.value.trim();
+  const password = inputAuthPassword?.value || '';
+
+  if (!email) {
+    mostrarToast('Por favor ingresá un correo válido.', 'error');
+    return;
+  }
+
+  // Si no ingresó contraseña, enviar Magic Link
+  if (!password) {
+    await iniciarSesionMagicLink();
+    return;
+  }
+
+  if (password.length < 6) {
+    mostrarToast('La contraseña debe tener al menos 6 caracteres.', 'error');
+    return;
+  }
+
+  if (!supabase) {
+    mostrarToast('Supabase no está conectado.', 'error');
+    return;
+  }
+
+  if (btnAuthPasswordSubmit) btnAuthPasswordSubmit.disabled = true;
+
+  try {
+    // 1. Intentar iniciar sesión con correo y contraseña
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (!signInError && signInData?.user) {
+      usuarioActual = signInData.user;
+      actualizarUIUsuario();
+      renderizarDashboard();
+      cerrarModalAuth();
+      if (inputAuthEmail) inputAuthEmail.value = '';
+      if (inputAuthPassword) inputAuthPassword.value = '';
+      mostrarToast('¡Sesión iniciada con éxito!', 'success');
+      return;
+    }
+
+    // 2. Si las credenciales no existen aún, intentar registrar la cuenta automáticamente
+    if (signInError && signInError.message?.toLowerCase().includes('invalid login credentials')) {
+      const redirectUrl = window.location.origin + window.location.pathname;
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: redirectUrl
+        }
+      });
+
+      if (signUpError) {
+        if (signUpError.message?.toLowerCase().includes('already registered')) {
+          throw new Error('Contraseña incorrecta para este correo.');
+        }
+        throw signUpError;
+      }
+
+      if (signUpData?.session && signUpData?.user) {
+        usuarioActual = signUpData.user;
+        actualizarUIUsuario();
+        renderizarDashboard();
+        cerrarModalAuth();
+        if (inputAuthEmail) inputAuthEmail.value = '';
+        if (inputAuthPassword) inputAuthPassword.value = '';
+        mostrarToast('¡Cuenta creada y sesión iniciada!', 'success');
+        return;
+      }
+
+      // Si Supabase requiere confirmación por email pero devuelve identidades vacías, el usuario ya existía
+      if (signUpData?.user && Array.isArray(signUpData.user.identities) && signUpData.user.identities.length === 0) {
+        throw new Error('Contraseña incorrecta para este correo.');
+      }
+
+      cerrarModalAuth();
+      if (inputAuthEmail) inputAuthEmail.value = '';
+      if (inputAuthPassword) inputAuthPassword.value = '';
+      mostrarToast('¡Cuenta creada! Revisá tu correo para confirmar el acceso.', 'success');
+      return;
+    }
+
+    if (signInError) throw signInError;
+  } catch (err) {
+    console.error('Error en autenticación por correo:', err);
+    mostrarToast(`Error: ${err.message}`, 'error');
+  } finally {
+    if (btnAuthPasswordSubmit) btnAuthPasswordSubmit.disabled = false;
   }
 }
 
@@ -216,6 +337,9 @@ const btnAuthGoogle = document.getElementById('btn-auth-google');
 const btnAuthFacebook = document.getElementById('btn-auth-facebook');
 const formAuthEmail = document.getElementById('form-auth-email');
 const inputAuthEmail = document.getElementById('input-auth-email');
+const inputAuthPassword = document.getElementById('input-auth-password');
+const btnAuthPasswordSubmit = document.getElementById('btn-auth-password-submit');
+const btnAuthMagicLink = document.getElementById('btn-auth-magiclink');
 
 // Banner y KPIs
 const btnBannerScan = document.getElementById('btn-banner-scan');
@@ -407,6 +531,11 @@ export function poblarSelectComercios(seleccionado = null) {
 }
 
 export function abrirModalComercio(comercioParaEditar = null) {
+  if (!usuarioActual) {
+    mostrarToast('Iniciá sesión para gestionar comercios', 'info');
+    abrirModalAuth();
+    return;
+  }
   if (!modalComercioBackdrop) return;
 
   if (comercioParaEditar) {
@@ -1275,6 +1404,7 @@ document.addEventListener('DOMContentLoaded', () => {
   btnAuthGoogle?.addEventListener('click', () => iniciarSesionOAuth('google'));
   btnAuthFacebook?.addEventListener('click', () => iniciarSesionOAuth('facebook'));
   formAuthEmail?.addEventListener('submit', iniciarSesionEmail);
+  btnAuthMagicLink?.addEventListener('click', iniciarSesionMagicLink);
   btnLogout?.addEventListener('click', cerrarSesion);
 
   modalAuthBackdrop?.addEventListener('click', (e) => {

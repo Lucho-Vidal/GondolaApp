@@ -1,4 +1,4 @@
-const CACHE_NAME = 'changocheck-shell-v7';
+const CACHE_NAME = 'changocheck-shell-v9';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -42,7 +42,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Bypass estricto (Network-Only) para Supabase (REST y WebSockets)
+  // Bypass estricto (Network-Only) para Supabase (REST, Auth y WebSockets)
   if (url.hostname.endsWith('supabase.co') || url.protocol === 'ws:' || url.protocol === 'wss:') {
     return;
   }
@@ -54,32 +54,24 @@ self.addEventListener('fetch', (event) => {
         .then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
             const copy = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+            caches.open(CACHE_NAME).then((cache) => cache.put('./index.html', copy));
           }
           return networkResponse;
         })
         .catch(() => {
-          return caches.match('./index.html') || caches.match('./');
+          return caches.match('./index.html', { ignoreSearch: true }) || caches.match('./');
         })
     );
     return;
   }
 
-  // Para assets estáticos (CSS, JS, iconos), usar Cache-First
-  event.respondWith(
-    caches.match(request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-
-      return fetch(request)
+  // Para assets propios (CSS, JS, iconos), usar Network-First con fallback a caché offline
+  // Esto evita que cambios de diseño/lógica queden desincronizados en móviles
+  if (url.origin === self.location.origin) {
+    event.respondWith(
+      fetch(request)
         .then((networkResponse) => {
-          if (
-            networkResponse &&
-            networkResponse.status === 200 &&
-            networkResponse.type === 'basic' &&
-            url.origin === self.location.origin
-          ) {
+          if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
             const responseClone = networkResponse.clone();
             caches.open(CACHE_NAME).then((cache) => {
               cache.put(request, responseClone);
@@ -88,8 +80,8 @@ self.addEventListener('fetch', (event) => {
           return networkResponse;
         })
         .catch(() => {
-          // Si falla un asset y estamos offline, nada adicional
-        });
-    })
-  );
+          return caches.match(request, { ignoreSearch: true });
+        })
+    );
+  }
 });
