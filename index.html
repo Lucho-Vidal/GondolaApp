@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=10">
+  <link rel="stylesheet" href="styles.css?v=11">
   <title>ChangoCheck — Precios de Góndola</title>
 </head>
 <body>
@@ -185,6 +185,11 @@
 
     <!-- Vista 4: Mi Chango (Compra en Supermercado y Control de Gasto) -->
     <section class="dashboard-view hidden" id="view-chango" role="tabpanel">
+      <div class="hogar-status-bar">
+        <span class="hogar-pill" id="hogar-pill-chango">👤 Modo personal</span>
+        <button type="button" class="btn-hogar-action" id="btn-hogar-chango">👥 Compartir / Unirse</button>
+      </div>
+
       <div class="chango-summary-card">
         <div class="chango-summary-top">
           <div>
@@ -238,6 +243,11 @@
 
     <!-- Vista 5: Stock Casa (Inventario del Hogar) -->
     <section class="dashboard-view hidden" id="view-stock" role="tabpanel">
+      <div class="hogar-status-bar">
+        <span class="hogar-pill" id="hogar-pill-stock">👤 Modo personal</span>
+        <button type="button" class="btn-hogar-action" id="btn-hogar-stock">👥 Compartir / Unirse</button>
+      </div>
+
       <div class="stock-summary-bar">
         <div class="stock-filter-pills" role="group" aria-label="Filtrar stock">
           <button type="button" class="stock-filter-pill active" id="btn-stock-filtro-todos">
@@ -650,6 +660,93 @@
     </div>
   </div>
 
+  <!-- Modal de Hogar Compartido (Grupo Privado) -->
+  <div class="sheet-backdrop hidden" id="modal-hogar-backdrop">
+    <div class="sheet-modal modal-comercio-card" id="modal-hogar" role="dialog" aria-modal="true" aria-labelledby="modal-hogar-title">
+      <div class="sheet-drag-handle"></div>
+      <div class="sheet-header">
+        <div class="sheet-title-wrap">
+          <h2 class="sheet-title" id="modal-hogar-title">Hogar Compartido</h2>
+          <p class="sheet-desc">Compartí tu Chango y Stock Casa en tiempo real de forma privada</p>
+        </div>
+        <button type="button" class="btn-sheet-close" id="btn-cerrar-modal-hogar" aria-label="Cerrar ventana">✕</button>
+      </div>
+      <div class="sheet-body">
+        <!-- Estado A: Sin hogar compartido -->
+        <div id="hogar-sin-grupo" class="hogar-panel">
+          <form id="form-crear-hogar" class="hogar-form-block" autocomplete="off">
+            <h3 class="hogar-section-title">Crear un nuevo Hogar</h3>
+            <div class="form-group">
+              <label for="input-hogar-nombre" class="form-label">Nombre del Hogar</label>
+              <input
+                type="text"
+                id="input-hogar-nombre"
+                class="form-input"
+                placeholder="Ej: Casa, Familia Vidal..."
+                maxlength="80"
+                required
+              >
+            </div>
+            <button type="submit" class="btn-primary btn-block" id="btn-crear-hogar">
+              Crear Hogar y Generar Código
+            </button>
+          </form>
+
+          <div class="auth-divider"><span>O unite con un código</span></div>
+
+          <form id="form-unirse-hogar" class="hogar-form-block" autocomplete="off">
+            <div class="form-group">
+              <label for="input-hogar-codigo" class="form-label">Código de Invitación</label>
+              <input
+                type="text"
+                id="input-hogar-codigo"
+                class="form-input hogar-code-input"
+                placeholder="Ej: CH-84K2A"
+                maxlength="16"
+                required
+              >
+            </div>
+            <button type="submit" class="btn-secondary btn-block" id="btn-unirse-hogar">
+              Unirme al Hogar
+            </button>
+          </form>
+        </div>
+
+        <!-- Estado B: Hogar activo -->
+        <div id="hogar-activo" class="hogar-panel hidden">
+          <div class="hogar-info-header">
+            <div>
+              <span class="chango-summary-label">Hogar activo</span>
+              <h3 class="hogar-active-name" id="hogar-activo-nombre">Casa</h3>
+            </div>
+            <span class="count-badge" id="hogar-miembros-count">1 miembro</span>
+          </div>
+
+          <div class="hogar-code-box">
+            <div>
+              <span class="hogar-code-label">Código de invitación privado</span>
+              <div class="hogar-code-value" id="hogar-activo-codigo">CH-XXXXX</div>
+            </div>
+            <div class="hogar-code-actions">
+              <button type="button" class="btn-inline-edit" id="btn-hogar-copiar" title="Copiar código">📋 Copiar</button>
+              <button type="button" class="btn-inline-edit" id="btn-hogar-compartir" title="Compartir enlace">🔗 Invitar</button>
+            </div>
+          </div>
+
+          <div class="hogar-members-wrap">
+            <span class="form-label">Miembros con acceso</span>
+            <div class="hogar-members-list" id="lista-hogar-miembros"></div>
+          </div>
+
+          <div class="modal-actions-row">
+            <button type="button" class="btn-secondary hidden" id="btn-hogar-regenerar">🔄 Nuevo código</button>
+            <button type="button" class="btn-secondary btn-danger-outline" id="btn-hogar-salir">🚪 Salir del hogar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal de Autenticación / Inicio de Sesión -->
   <div class="sheet-backdrop auth-modal-backdrop hidden" id="modal-auth-backdrop">
     <div class="sheet-modal auth-modal-card" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
@@ -735,7 +832,7 @@
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=10')
+        navigator.serviceWorker.register('./sw.js?v=11')
           .then((reg) => {
             reg.update();
             console.log('SW registrado:', reg.scope);
@@ -746,6 +843,6 @@
   </script>
 
   <!-- Lógica Principal -->
-  <script type="module" src="app.js?v=10"></script>
+  <script type="module" src="app.js?v=11"></script>
 </body>
 </html>

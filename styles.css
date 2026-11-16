@@ -2094,3 +2094,147 @@ body {
   background-color: var(--primary);
   color: #04241E;
 }
+
+/* ==========================================================================
+   Hogar Compartido (Modo Colaborativo Privado)
+   ========================================================================== */
+.hogar-status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+}
+
+.hogar-pill {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text-main);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hogar-pill.shared {
+  color: var(--primary);
+}
+
+.btn-hogar-action {
+  min-height: 36px;
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-highlight);
+  background-color: var(--primary-subtle);
+  color: var(--primary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-hogar-action:hover {
+  background-color: var(--primary);
+  color: #04241E;
+}
+
+.hogar-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.hogar-form-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hogar-section-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.hogar-code-input {
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.hogar-info-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.hogar-active-name {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.hogar-code-box {
+  background-color: var(--bg-surface-elevated);
+  border: 1px dashed var(--border-highlight);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.hogar-code-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  display: block;
+}
+
+.hogar-code-value {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--primary);
+  letter-spacing: 0.08em;
+}
+
+.hogar-code-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.hogar-members-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hogar-members-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hogar-member-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: var(--bg-surface-elevated);
+  border-radius: var(--radius-sm);
+  font-size: 0.86rem;
+}
+
+.btn-danger-outline {
+  border-color: rgba(239, 68, 68, 0.45);
+  color: var(--danger);
+}
+
+.btn-danger-outline:hover {
+  background-color: rgba(239, 68, 68, 0.14);
+}
+

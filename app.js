@@ -58,9 +58,20 @@ export function removerIdDePropios(id) {
 export async function inicializarSesion() {
   if (!supabase) return null;
   try {
-    // Verificar si la URL trae errores de redirección OAuth (ej: proveedor desactivado en Supabase)
     const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
     const searchParams = new URLSearchParams(window.location.search);
+
+    const codigoInvitacionUrl = searchParams.get('hogar');
+    if (codigoInvitacionUrl) {
+      try {
+        sessionStorage.setItem('changocheck_pending_hogar', codigoInvitacionUrl.trim().toUpperCase());
+      } catch (e) {}
+      searchParams.delete('hogar');
+      const nuevaQuery = searchParams.toString();
+      window.history.replaceState({}, document.title, window.location.pathname + (nuevaQuery ? `?${nuevaQuery}` : ''));
+    }
+
+    // Verificar si la URL trae errores de redirección OAuth (ej: proveedor desactivado en Supabase)
     const oauthError = hashParams.get('error_description') || searchParams.get('error_description') || hashParams.get('error');
     if (oauthError) {
       const msgDecodificado = decodeURIComponent(oauthError.replace(/\+/g, ' '));
@@ -77,14 +88,22 @@ export async function inicializarSesion() {
     actualizarUIUsuario();
 
     // Escuchar cambios de sesión (cuando el usuario regresa del redirect de Google o Facebook)
-    supabase.auth.onAuthStateChange((event, session) => {
+    supabase.auth.onAuthStateChange(async (event, session) => {
       usuarioActual = session?.user || null;
       actualizarUIUsuario();
       renderizarDashboard();
       if (event === 'SIGNED_IN' && usuarioActual) {
         cerrarModalAuth();
-        cargarChangoInicial();
-        cargarStockInicial();
+        await procesarInvitacionPendiente();
+        await cargarHogarInicial();
+        await cargarChangoInicial();
+        await cargarStockInicial();
+        suscribirRealtimeHogar();
+      } else if (event === 'SIGNED_OUT') {
+        hogarActual = null;
+        miembrosHogar = [];
+        actualizarUIHogar();
+        suscribirRealtimeHogar();
       }
     });
 
@@ -303,6 +322,8 @@ export let listaPrecios = [];
 export let listaComercios = [];
 export let listaChango = [];
 export let listaStock = [];
+export let hogarActual = null;
+export let miembrosHogar = [];
 let presupuestoChango = 0;
 let filtroStock = 'todos'; // 'todos' | 'bajo'
 let vistaActual = 'recientes'; // 'recientes' | 'comparador' | 'comercios' | 'chango' | 'stock'
@@ -313,6 +334,8 @@ let escanerStockActivo = false;
 let toastTimeout = null;
 let realtimeChannelPrecios = null;
 let realtimeChannelComercios = null;
+let realtimeChannelChango = null;
+let realtimeChannelStock = null;
 
 const LOCAL_STORAGE_KEY = 'changocheck_precios_cache';
 const LOCAL_STORAGE_COMERCIOS = 'changocheck_comercios_list';
@@ -320,6 +343,7 @@ const LOCAL_STORAGE_COMERCIO = 'changocheck_last_comercio';
 const LOCAL_STORAGE_CHANGO = 'changocheck_chango_cache';
 const LOCAL_STORAGE_CHANGO_BUDGET = 'changocheck_chango_budget';
 const LOCAL_STORAGE_STOCK = 'changocheck_stock_cache';
+const LOCAL_STORAGE_HOGAR = 'changocheck_hogar_cache';
 
 const COMERCIOS_DEFAULT = [
   { id: 1, nombre: 'Coto', ubicacion: 'Sucursal Central', descripcion: 'Supermercado e Hipermercado' },
@@ -402,6 +426,28 @@ const stockTotalCount = document.getElementById('stock-total-count');
 const stockBajoCount = document.getElementById('stock-bajo-count');
 const stockVisibleCount = document.getElementById('stock-visible-count');
 const btnStockAgregar = document.getElementById('btn-stock-agregar');
+
+// Elementos Hogar Compartido
+const hogarPillChango = document.getElementById('hogar-pill-chango');
+const btnHogarChango = document.getElementById('btn-hogar-chango');
+const hogarPillStock = document.getElementById('hogar-pill-stock');
+const btnHogarStock = document.getElementById('btn-hogar-stock');
+const modalHogarBackdrop = document.getElementById('modal-hogar-backdrop');
+const btnCerrarModalHogar = document.getElementById('btn-cerrar-modal-hogar');
+const hogarSinGrupo = document.getElementById('hogar-sin-grupo');
+const hogarActivoEl = document.getElementById('hogar-activo');
+const formCrearHogar = document.getElementById('form-crear-hogar');
+const inputHogarNombre = document.getElementById('input-hogar-nombre');
+const formUnirseHogar = document.getElementById('form-unirse-hogar');
+const inputHogarCodigo = document.getElementById('input-hogar-codigo');
+const hogarActivoNombre = document.getElementById('hogar-activo-nombre');
+const hogarMiembrosCount = document.getElementById('hogar-miembros-count');
+const hogarActivoCodigo = document.getElementById('hogar-activo-codigo');
+const btnHogarCopiar = document.getElementById('btn-hogar-copiar');
+const btnHogarCompartir = document.getElementById('btn-hogar-compartir');
+const listaHogarMiembros = document.getElementById('lista-hogar-miembros');
+const btnHogarRegenerar = document.getElementById('btn-hogar-regenerar');
+const btnHogarSalir = document.getElementById('btn-hogar-salir');
 
 // FAB y Modal Bottom Sheet de Precio
 const btnFabCarga = document.getElementById('btn-fab-carga');
@@ -1558,11 +1604,18 @@ export async function cargarChangoInicial() {
   if (!supabase || !usuarioActual) return;
 
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from('chango_items')
       .select('*')
-      .eq('user_id', usuarioActual.id)
       .order('created_at', { ascending: false });
+
+    if (hogarActual?.id) {
+      query = query.eq('hogar_id', hogarActual.id);
+    } else {
+      query = query.eq('user_id', usuarioActual.id).is('hogar_id', null);
+    }
+
+    const { data, error } = await query;
 
     if (!error && data) {
       listaChango = data;
@@ -1638,7 +1691,9 @@ export async function agregarItemAlChango({
     cantidad_pack: Number(Number(cantidad_pack).toFixed(3)),
     unidad,
     cantidad_chango: Number(Number(cantidad_chango).toFixed(3)),
-    comprado: true
+    comprado: true,
+    hogar_id: hogarActual?.id || null,
+    added_by_name: obtenerNombreUsuarioActual()
   };
 
   if (supabase && usuarioActual) {
@@ -1650,7 +1705,8 @@ export async function agregarItemAlChango({
 
       if (error) throw error;
       if (data && data[0]) {
-        listaChango.unshift(data[0]);
+        const yaEnLista = listaChango.some((i) => String(i.id) === String(data[0].id));
+        if (!yaEnLista) listaChango.unshift(data[0]);
       }
     } catch (err) {
       console.warn('Guardando ítem de chango localmente:', err);
@@ -1780,7 +1836,11 @@ export async function vaciarChango(pedirConfirmacion = true) {
 
   if (supabase && usuarioActual) {
     try {
-      await supabase.from('chango_items').delete().eq('user_id', usuarioActual.id);
+      if (hogarActual?.id) {
+        await supabase.from('chango_items').delete().eq('hogar_id', hogarActual.id);
+      } else {
+        await supabase.from('chango_items').delete().eq('user_id', usuarioActual.id).is('hogar_id', null);
+      }
     } catch (e) {
       console.warn('Error vaciando chango en Supabase:', e);
     }
@@ -1896,6 +1956,7 @@ export function renderizarChango() {
             <div class="price-card-badges">
               <span class="badge-comercio">${escapeHTML(item.comercio)}</span>
               ${item.codigo_barra ? `<span class="badge-codigo">#${escapeHTML(item.codigo_barra)}</span>` : ''}
+              ${(hogarActual && item.added_by_name) ? `<span class="badge-autor">👤 ${escapeHTML(item.added_by_name)}</span>` : ''}
             </div>
           </div>
           <button type="button" class="btn-delete-item btn-chango-del" data-id="${item.id}" title="Quitar del chango">
@@ -1966,11 +2027,18 @@ export async function cargarStockInicial() {
   if (!supabase || !usuarioActual) return;
 
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from('stock_casa')
       .select('*')
-      .eq('user_id', usuarioActual.id)
       .order('producto', { ascending: true });
+
+    if (hogarActual?.id) {
+      query = query.eq('hogar_id', hogarActual.id);
+    } else {
+      query = query.eq('user_id', usuarioActual.id).is('hogar_id', null);
+    }
+
+    const { data, error } = await query;
 
     if (!error && data) {
       listaStock = data;
@@ -2010,7 +2078,9 @@ export async function sumarOActualizarEnStock({ codigo_barra = null, producto, c
     cantidad: Number(Number(cantidad).toFixed(3)),
     unidad,
     stock_minimo: 1,
-    categoria: 'General'
+    categoria: 'General',
+    hogar_id: hogarActual?.id || null,
+    added_by_name: obtenerNombreUsuarioActual()
   };
 
   if (supabase && usuarioActual) {
@@ -2020,7 +2090,8 @@ export async function sumarOActualizarEnStock({ codigo_barra = null, producto, c
         .insert([{ ...nuevoStock, user_id: usuarioActual.id }])
         .select();
       if (!error && data && data[0]) {
-        listaStock.push(data[0]);
+        const yaEnLista = listaStock.some((s) => String(s.id) === String(data[0].id));
+        if (!yaEnLista) listaStock.push(data[0]);
         guardarStockLocal();
         return;
       }
@@ -2140,6 +2211,8 @@ export async function guardarItemStock(e) {
     unidad,
     stock_minimo: Number(stock_minimo.toFixed(3)),
     categoria,
+    hogar_id: hogarActual?.id || null,
+    added_by_name: obtenerNombreUsuarioActual(),
     updated_at: new Date().toISOString()
   };
 
@@ -2342,6 +2415,302 @@ export function renderizarStock() {
 }
 
 /* ==========================================================================
+   Hogar Compartido (Modo Colaborativo Privado y Realtime)
+   ========================================================================== */
+export function obtenerNombreUsuarioActual() {
+  if (!usuarioActual) return 'Invitado';
+  const meta = usuarioActual.user_metadata || {};
+  return meta.full_name || meta.name || usuarioActual.email?.split('@')[0] || 'Usuario';
+}
+
+export function actualizarUIHogar() {
+  const textoPill = hogarActual
+    ? `👥 ${hogarActual.nombre} (${Math.max(1, miembrosHogar.length)})`
+    : '👤 Modo personal';
+  const textoBtn = hogarActual ? '⚙️ Gestionar' : '👥 Compartir / Unirse';
+
+  [hogarPillChango, hogarPillStock].forEach((el) => {
+    if (!el) return;
+    el.textContent = textoPill;
+    el.classList.toggle('shared', Boolean(hogarActual));
+  });
+
+  [btnHogarChango, btnHogarStock].forEach((btn) => {
+    if (btn) btn.textContent = textoBtn;
+  });
+
+  if (hogarActual) {
+    hogarSinGrupo?.classList.add('hidden');
+    hogarActivoEl?.classList.remove('hidden');
+    if (hogarActivoNombre) hogarActivoNombre.textContent = hogarActual.nombre;
+    if (hogarActivoCodigo) hogarActivoCodigo.textContent = hogarActual.codigo_invitacion;
+    if (hogarMiembrosCount) {
+      const n = Math.max(1, miembrosHogar.length);
+      hogarMiembrosCount.textContent = `${n} ${n === 1 ? 'miembro' : 'miembros'}`;
+    }
+
+    const soyCreador = usuarioActual && hogarActual.created_by === usuarioActual.id;
+    btnHogarRegenerar?.classList.toggle('hidden', !soyCreador);
+
+    if (listaHogarMiembros) {
+      listaHogarMiembros.innerHTML = miembrosHogar.map((m) => `
+        <div class="hogar-member-row">
+          <span>👤 ${escapeHTML(m.display_name || 'Miembro')}</span>
+          <span class="badge-categoria">${m.rol === 'owner' ? 'Creador' : 'Miembro'}</span>
+        </div>
+      `).join('');
+    }
+  } else {
+    hogarSinGrupo?.classList.remove('hidden');
+    hogarActivoEl?.classList.add('hidden');
+  }
+}
+
+export function abrirModalHogar() {
+  if (!usuarioActual) {
+    mostrarToast('Iniciá sesión para compartir tu Chango y Stock Casa.', 'info');
+    abrirModalAuth();
+    return;
+  }
+  actualizarUIHogar();
+  modalHogarBackdrop?.classList.remove('hidden');
+}
+
+export function cerrarModalHogar() {
+  modalHogarBackdrop?.classList.add('hidden');
+}
+
+export async function cargarHogarInicial() {
+  if (!supabase || !usuarioActual) {
+    hogarActual = null;
+    miembrosHogar = [];
+    actualizarUIHogar();
+    return;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('hogar_miembros')
+      .select('rol, display_name, hogares(*)')
+      .eq('user_id', usuarioActual.id)
+      .limit(1);
+
+    if (!error && data && data.length > 0 && data[0].hogares) {
+      hogarActual = data[0].hogares;
+      try {
+        localStorage.setItem(LOCAL_STORAGE_HOGAR, JSON.stringify(hogarActual));
+      } catch (e) {}
+
+      const { data: miembros } = await supabase
+        .from('hogar_miembros')
+        .select('user_id, display_name, rol')
+        .eq('hogar_id', hogarActual.id);
+      miembrosHogar = miembros || [];
+    } else {
+      hogarActual = null;
+      miembrosHogar = [];
+      try {
+        localStorage.removeItem(LOCAL_STORAGE_HOGAR);
+      } catch (e) {}
+    }
+  } catch (err) {
+    console.warn('Aviso cargando hogar:', err);
+  }
+
+  actualizarUIHogar();
+}
+
+export async function procesarInvitacionPendiente() {
+  if (!supabase || !usuarioActual) return;
+  let codigo = null;
+  try {
+    codigo = sessionStorage.getItem('changocheck_pending_hogar');
+  } catch (e) {}
+  if (!codigo) return;
+
+  try {
+    sessionStorage.removeItem('changocheck_pending_hogar');
+  } catch (e) {}
+  await unirseAHogarPorCodigo(codigo);
+}
+
+export async function crearHogar(e) {
+  e.preventDefault();
+  const nombre = inputHogarNombre?.value.trim();
+  if (!nombre || nombre.length < 2) {
+    mostrarToast('Ingresá un nombre válido para tu hogar.', 'error');
+    return;
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('crear_hogar', {
+      p_nombre: nombre,
+      p_display_name: obtenerNombreUsuarioActual()
+    });
+    if (error) throw error;
+
+    hogarActual = data;
+    if (inputHogarNombre) inputHogarNombre.value = '';
+    await cargarHogarInicial();
+    await cargarChangoInicial();
+    await cargarStockInicial();
+    suscribirRealtimeHogar();
+    mostrarToast(`Hogar "${hogarActual.nombre}" creado. Código: ${hogarActual.codigo_invitacion}`, 'success');
+  } catch (err) {
+    console.error('Error creando hogar:', err);
+    mostrarToast(`Error: ${err.message || 'No se pudo crear el hogar'}`, 'error');
+  }
+}
+
+export async function unirseAHogarPorCodigo(codigo) {
+  const limpio = codigo?.trim().toUpperCase();
+  if (!limpio) {
+    mostrarToast('Ingresá un código de invitación.', 'error');
+    return;
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('unirse_a_hogar', {
+      p_codigo: limpio,
+      p_display_name: obtenerNombreUsuarioActual()
+    });
+    if (error) throw error;
+
+    hogarActual = data;
+    if (inputHogarCodigo) inputHogarCodigo.value = '';
+    await cargarHogarInicial();
+    await cargarChangoInicial();
+    await cargarStockInicial();
+    suscribirRealtimeHogar();
+    mostrarToast(`¡Te uniste al hogar "${hogarActual.nombre}"!`, 'success');
+  } catch (err) {
+    console.error('Error uniéndose al hogar:', err);
+    mostrarToast(err.message || 'Código inválido o expirado', 'error');
+  }
+}
+
+export async function regenerarCodigoHogar() {
+  if (!hogarActual?.id) return;
+  if (!confirm('¿Generar un nuevo código? El código anterior dejará de funcionar.')) return;
+
+  try {
+    const { data, error } = await supabase.rpc('regenerar_codigo_hogar', {
+      p_hogar_id: hogarActual.id
+    });
+    if (error) throw error;
+
+    hogarActual.codigo_invitacion = data;
+    actualizarUIHogar();
+    mostrarToast(`Nuevo código generado: ${data}`, 'success');
+  } catch (err) {
+    mostrarToast(err.message || 'No se pudo regenerar el código', 'error');
+  }
+}
+
+export async function salirDelHogar() {
+  if (!hogarActual?.id || !usuarioActual) return;
+  if (!confirm(`¿Salir del hogar "${hogarActual.nombre}"? Volverás a tu modo personal.`)) return;
+
+  try {
+    const { error } = await supabase
+      .from('hogar_miembros')
+      .delete()
+      .eq('hogar_id', hogarActual.id)
+      .eq('user_id', usuarioActual.id);
+
+    if (error) throw error;
+
+    hogarActual = null;
+    miembrosHogar = [];
+    actualizarUIHogar();
+    await cargarChangoInicial();
+    await cargarStockInicial();
+    suscribirRealtimeHogar();
+    cerrarModalHogar();
+    mostrarToast('Saliste del hogar compartido.', 'info');
+  } catch (err) {
+    mostrarToast(err.message || 'No se pudo salir del hogar', 'error');
+  }
+}
+
+export function suscribirRealtimeHogar() {
+  if (!supabase) return;
+
+  if (realtimeChannelChango) {
+    supabase.removeChannel(realtimeChannelChango);
+    realtimeChannelChango = null;
+  }
+  if (realtimeChannelStock) {
+    supabase.removeChannel(realtimeChannelStock);
+    realtimeChannelStock = null;
+  }
+
+  if (!usuarioActual) return;
+
+  const filtro = hogarActual?.id
+    ? `hogar_id=eq.${hogarActual.id}`
+    : `user_id=eq.${usuarioActual.id}`;
+
+  realtimeChannelChango = supabase
+    .channel(`chango:${hogarActual?.id || usuarioActual.id}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'chango_items', filter: filtro },
+      (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const existe = listaChango.some((i) => String(i.id) === String(payload.new.id));
+          if (!existe) {
+            listaChango.unshift(payload.new);
+            guardarChangoLocal();
+            if (vistaActual === 'chango') renderizarChango();
+          }
+        } else if (payload.eventType === 'UPDATE') {
+          const idx = listaChango.findIndex((i) => String(i.id) === String(payload.new.id));
+          if (idx >= 0) {
+            listaChango[idx] = payload.new;
+            guardarChangoLocal();
+            if (vistaActual === 'chango') renderizarChango();
+          }
+        } else if (payload.eventType === 'DELETE') {
+          listaChango = listaChango.filter((i) => String(i.id) !== String(payload.old.id));
+          guardarChangoLocal();
+          if (vistaActual === 'chango') renderizarChango();
+        }
+      }
+    )
+    .subscribe();
+
+  realtimeChannelStock = supabase
+    .channel(`stock:${hogarActual?.id || usuarioActual.id}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'stock_casa', filter: filtro },
+      (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const existe = listaStock.some((s) => String(s.id) === String(payload.new.id));
+          if (!existe) {
+            listaStock.push(payload.new);
+            guardarStockLocal();
+            if (vistaActual === 'stock') renderizarStock();
+          }
+        } else if (payload.eventType === 'UPDATE') {
+          const idx = listaStock.findIndex((s) => String(s.id) === String(payload.new.id));
+          if (idx >= 0) {
+            listaStock[idx] = payload.new;
+            guardarStockLocal();
+            if (vistaActual === 'stock') renderizarStock();
+          }
+        } else if (payload.eventType === 'DELETE') {
+          listaStock = listaStock.filter((s) => String(s.id) !== String(payload.old.id));
+          guardarStockLocal();
+          if (vistaActual === 'stock') renderizarStock();
+        }
+      }
+    )
+    .subscribe();
+}
+
+/* ==========================================================================
    Inicialización de Eventos del DOM
    ========================================================================== */
 document.addEventListener('DOMContentLoaded', () => {
@@ -2462,6 +2831,47 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // Eventos Hogar Compartido
+  btnHogarChango?.addEventListener('click', abrirModalHogar);
+  btnHogarStock?.addEventListener('click', abrirModalHogar);
+  btnCerrarModalHogar?.addEventListener('click', cerrarModalHogar);
+  modalHogarBackdrop?.addEventListener('click', (e) => {
+    if (e.target === modalHogarBackdrop) cerrarModalHogar();
+  });
+  formCrearHogar?.addEventListener('submit', crearHogar);
+  formUnirseHogar?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    unirseAHogarPorCodigo(inputHogarCodigo?.value);
+  });
+  btnHogarCopiar?.addEventListener('click', async () => {
+    if (!hogarActual?.codigo_invitacion) return;
+    try {
+      await navigator.clipboard.writeText(hogarActual.codigo_invitacion);
+      mostrarToast(`Código ${hogarActual.codigo_invitacion} copiado`, 'success');
+    } catch {
+      mostrarToast(`Código: ${hogarActual.codigo_invitacion}`, 'info');
+    }
+  });
+  btnHogarCompartir?.addEventListener('click', async () => {
+    if (!hogarActual?.codigo_invitacion) return;
+    const url = `${window.location.origin}${window.location.pathname}?hogar=${encodeURIComponent(hogarActual.codigo_invitacion)}`;
+    const texto = `Unite a nuestro hogar "${hogarActual.nombre}" en ChangoCheck para compartir el chango y el stock: ${url}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Invitación ChangoCheck', text: texto, url });
+        return;
+      } catch (e) {}
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      mostrarToast('Enlace de invitación copiado para compartir', 'success');
+    } catch {
+      mostrarToast(url, 'info');
+    }
+  });
+  btnHogarRegenerar?.addEventListener('click', regenerarCodigoHogar);
+  btnHogarSalir?.addEventListener('click', salirDelHogar);
+
   // Eventos de Gestión de Comercios
   btnNuevoComercioForm?.addEventListener('click', () => abrirModalComercio(null));
   btnNuevoComercioTab?.addEventListener('click', () => abrirModalComercio(null));
@@ -2494,6 +2904,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Escape') {
       if (!modalAuthBackdrop?.classList.contains('hidden')) {
         cerrarModalAuth();
+      } else if (!modalHogarBackdrop?.classList.contains('hidden')) {
+        cerrarModalHogar();
       } else if (!modalStockBackdrop?.classList.contains('hidden')) {
         cerrarModalStock();
       } else if (!modalComercioBackdrop?.classList.contains('hidden')) {
@@ -2521,11 +2933,14 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Carga inicial, sesión y Suscripciones Realtime
-  inicializarSesion().finally(() => {
+  inicializarSesion().finally(async () => {
     cargarComerciosIniciales();
     cargarPreciosIniciales();
+    await procesarInvitacionPendiente();
+    await cargarHogarInicial();
     cargarChangoInicial();
     cargarStockInicial();
     suscribirRealtime();
+    suscribirRealtimeHogar();
   });
 });
