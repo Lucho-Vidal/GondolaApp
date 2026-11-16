@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=9">
+  <link rel="stylesheet" href="styles.css?v=10">
   <title>ChangoCheck — Precios de Góndola</title>
 </head>
 <body>
@@ -126,6 +126,12 @@
         <button type="button" class="segment-tab" id="tab-comercios" role="tab" aria-selected="false">
           🏬 Por Comercio
         </button>
+        <button type="button" class="segment-tab" id="tab-chango" role="tab" aria-selected="false">
+          🛒 Mi Chango
+        </button>
+        <button type="button" class="segment-tab" id="tab-stock" role="tab" aria-selected="false">
+          🏠 Stock Casa
+        </button>
       </div>
     </section>
 
@@ -144,7 +150,7 @@
       >
     </div>
 
-    <!-- Contenedores de las 3 Vistas -->
+    <!-- Contenedores de las 5 Vistas -->
     <!-- Vista 1: Recientes (Cronológica) -->
     <section class="dashboard-view active" id="view-recientes" role="tabpanel">
       <div class="view-header">
@@ -175,6 +181,82 @@
         </button>
       </div>
       <div class="stores-list" id="lista-comercios"></div>
+    </section>
+
+    <!-- Vista 4: Mi Chango (Compra en Supermercado y Control de Gasto) -->
+    <section class="dashboard-view hidden" id="view-chango" role="tabpanel">
+      <div class="chango-summary-card">
+        <div class="chango-summary-top">
+          <div>
+            <span class="chango-summary-label">Total del Chango</span>
+            <div class="chango-total-amount" id="chango-total-gasto">$0,00</div>
+          </div>
+          <div class="chango-meta-right">
+            <span class="count-badge" id="chango-items-count">0 ítems</span>
+            <span class="chango-units-sub" id="chango-units-count">0 unidades</span>
+          </div>
+        </div>
+
+        <div class="chango-budget-row">
+          <label for="input-chango-presupuesto" class="chango-budget-label">Presupuesto ($):</label>
+          <input
+            type="number"
+            id="input-chango-presupuesto"
+            class="form-input chango-budget-input"
+            inputmode="decimal"
+            min="0"
+            step="100"
+            placeholder="Sin límite"
+          >
+        </div>
+
+        <div class="budget-progress-wrap hidden" id="chango-budget-progress-wrap">
+          <div class="budget-progress-track">
+            <div class="budget-progress-bar" id="chango-budget-bar"></div>
+          </div>
+          <span class="budget-progress-text" id="chango-budget-text">0% del presupuesto</span>
+        </div>
+
+        <div class="chango-actions-bar">
+          <button type="button" class="btn-primary chango-btn-add" id="btn-chango-agregar">
+            + Agregar al Chango
+          </button>
+          <button type="button" class="btn-secondary chango-btn-finish" id="btn-chango-finalizar">
+            ✓ Finalizar Compra
+          </button>
+        </div>
+      </div>
+
+      <div class="view-header">
+        <h2 class="view-title">Productos en el Chango</h2>
+        <button type="button" class="btn-text-action" id="btn-chango-vaciar" title="Vaciar chango">
+          🗑️ Vaciar
+        </button>
+      </div>
+      <div class="chango-items-list" id="lista-chango"></div>
+    </section>
+
+    <!-- Vista 5: Stock Casa (Inventario del Hogar) -->
+    <section class="dashboard-view hidden" id="view-stock" role="tabpanel">
+      <div class="stock-summary-bar">
+        <div class="stock-filter-pills" role="group" aria-label="Filtrar stock">
+          <button type="button" class="stock-filter-pill active" id="btn-stock-filtro-todos">
+            📦 Todos (<span id="stock-total-count">0</span>)
+          </button>
+          <button type="button" class="stock-filter-pill" id="btn-stock-filtro-bajo">
+            ⚠️ Por acabarse (<span id="stock-bajo-count">0</span>)
+          </button>
+        </div>
+        <button type="button" class="btn-action-small" id="btn-stock-agregar">
+          + Agregar
+        </button>
+      </div>
+
+      <div class="view-header">
+        <h2 class="view-title">Stock en Casa</h2>
+        <span class="count-badge" id="stock-visible-count">0 productos</span>
+      </div>
+      <div class="stock-items-list" id="lista-stock"></div>
     </section>
   </main>
 
@@ -343,6 +425,32 @@
               <span class="preview-value" id="precio-unitario-val">—</span>
             </div>
 
+            <!-- Opciones de Chango (cuando se carga desde Mi Chango o se marca) -->
+            <div class="chango-form-extras" id="chango-form-extras">
+              <label class="checkbox-row">
+                <input type="checkbox" id="check-agregar-chango">
+                <span>🛒 Agregar también a <strong>Mi Chango</strong></span>
+              </label>
+              <div class="chango-extras-fields hidden" id="chango-extras-fields">
+                <div class="form-group">
+                  <label for="chango-cantidad-unidades" class="form-label">Unidades en el chango</label>
+                  <input
+                    type="number"
+                    id="chango-cantidad-unidades"
+                    class="form-input input-numeric"
+                    inputmode="decimal"
+                    step="1"
+                    min="1"
+                    value="1"
+                  >
+                </div>
+                <label class="checkbox-row checkbox-sub">
+                  <input type="checkbox" id="check-actualizar-precio-gondola" checked>
+                  <span>Actualizar precio en la base de góndola</span>
+                </label>
+              </div>
+            </div>
+
             <!-- Botón Guardar -->
             <button type="submit" class="btn-primary" id="btn-guardar">
               <svg class="save-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -350,7 +458,7 @@
                 <polyline points="17 21 17 13 7 13 7 21"></polyline>
                 <polyline points="7 3 7 8 15 8"></polyline>
               </svg>
-              <span>Guardar Precio</span>
+              <span id="btn-guardar-text">Guardar Precio</span>
             </button>
           </div>
         </form>
@@ -414,6 +522,128 @@
           <div class="modal-actions-row">
             <button type="button" class="btn-secondary" id="btn-cancelar-comercio">Cancelar</button>
             <button type="submit" class="btn-primary" id="btn-guardar-comercio">Guardar Comercio</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal para Agregar / Editar Stock en Casa -->
+  <div class="sheet-backdrop hidden" id="modal-stock-backdrop">
+    <div class="sheet-modal modal-comercio-card" id="modal-stock" role="dialog" aria-modal="true" aria-labelledby="modal-stock-title">
+      <div class="sheet-drag-handle"></div>
+      <div class="sheet-header">
+        <div class="sheet-title-wrap">
+          <h2 class="sheet-title" id="modal-stock-title">Agregar al Stock</h2>
+          <p class="sheet-desc">Registrá lo que tenés en casa y tu mínimo deseado</p>
+        </div>
+        <button type="button" class="btn-sheet-close" id="btn-cerrar-modal-stock" aria-label="Cerrar ventana">✕</button>
+      </div>
+      <div class="sheet-body">
+        <section class="scanner-section hidden" id="stock-scanner-section" aria-label="Visor de escaneo stock">
+          <div class="scanner-card">
+            <div class="scanner-header">
+              <div class="scanner-title-wrap">
+                <span class="scanner-live-badge">EN VIVO</span>
+                <p class="scanner-instructions">Escaneá el producto para tu stock</p>
+              </div>
+              <button type="button" class="btn-icon-close" id="btn-cerrar-escaner-stock" aria-label="Cerrar cámara">✕</button>
+            </div>
+            <div id="reader-stock" class="scanner-viewport"></div>
+          </div>
+        </section>
+
+        <form id="form-stock" autocomplete="off" novalidate>
+          <input type="hidden" id="stock-id" name="id">
+
+          <div class="form-group">
+            <label for="stock-codigo" class="form-label">Código de Barras</label>
+            <div class="input-with-action">
+              <input
+                type="text"
+                id="stock-codigo"
+                name="codigo_barra"
+                class="form-input"
+                inputmode="numeric"
+                placeholder="Opcional: escaneá o escribí el código"
+                maxlength="64"
+              >
+              <button type="button" class="btn-scan" id="btn-scan-stock" aria-label="Escanear código para stock">
+                <span id="btn-scan-stock-text">Escanear</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="stock-producto" class="form-label">Producto <span class="required">*</span></label>
+            <input
+              type="text"
+              id="stock-producto"
+              name="producto"
+              class="form-input"
+              placeholder="Ej: Leche La Serenísima 1L"
+              maxlength="150"
+              required
+            >
+          </div>
+
+          <div class="form-row-grid">
+            <div class="form-group">
+              <label for="stock-cantidad" class="form-label">Cantidad <span class="required">*</span></label>
+              <input
+                type="number"
+                id="stock-cantidad"
+                name="cantidad"
+                class="form-input input-numeric"
+                inputmode="decimal"
+                step="0.1"
+                min="0"
+                value="1"
+                required
+              >
+            </div>
+
+            <div class="form-group">
+              <label for="stock-unidad" class="form-label">Unidad <span class="required">*</span></label>
+              <select id="stock-unidad" name="unidad" class="form-select" required>
+                <option value="un">un</option>
+                <option value="kg">kg</option>
+                <option value="g">g</option>
+                <option value="l">l</option>
+                <option value="ml">ml</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="stock-minimo" class="form-label">Mínimo</label>
+              <input
+                type="number"
+                id="stock-minimo"
+                name="stock_minimo"
+                class="form-input input-numeric"
+                inputmode="decimal"
+                step="0.1"
+                min="0"
+                value="1"
+              >
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="stock-categoria" class="form-label">Ubicación / Categoría</label>
+            <select id="stock-categoria" name="categoria" class="form-select">
+              <option value="Alacena">🥫 Alacena</option>
+              <option value="Heladera">🧊 Heladera</option>
+              <option value="Freezer">❄️ Freezer</option>
+              <option value="Limpieza">🧹 Limpieza</option>
+              <option value="Perfumería">🧴 Perfumería</option>
+              <option value="General" selected>📦 General</option>
+            </select>
+          </div>
+
+          <div class="modal-actions-row">
+            <button type="button" class="btn-secondary" id="btn-cancelar-stock">Cancelar</button>
+            <button type="submit" class="btn-primary" id="btn-guardar-stock">Guardar en Stock</button>
           </div>
         </form>
       </div>
@@ -505,7 +735,7 @@
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=9')
+        navigator.serviceWorker.register('./sw.js?v=10')
           .then((reg) => {
             reg.update();
             console.log('SW registrado:', reg.scope);
@@ -516,6 +746,6 @@
   </script>
 
   <!-- Lógica Principal -->
-  <script type="module" src="app.js?v=9"></script>
+  <script type="module" src="app.js?v=10"></script>
 </body>
 </html>

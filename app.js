@@ -83,6 +83,8 @@ export async function inicializarSesion() {
       renderizarDashboard();
       if (event === 'SIGNED_IN' && usuarioActual) {
         cerrarModalAuth();
+        cargarChangoInicial();
+        cargarStockInicial();
       }
     });
 
@@ -299,9 +301,15 @@ export async function cerrarSesion() {
    ========================================================================== */
 export let listaPrecios = [];
 export let listaComercios = [];
-let vistaActual = 'recientes'; // 'recientes' | 'comparador' | 'comercios'
+export let listaChango = [];
+export let listaStock = [];
+let presupuestoChango = 0;
+let filtroStock = 'todos'; // 'todos' | 'bajo'
+let vistaActual = 'recientes'; // 'recientes' | 'comparador' | 'comercios' | 'chango' | 'stock'
 let html5QrCode = null;
 let escanerActivo = false;
+let html5QrCodeStock = null;
+let escanerStockActivo = false;
 let toastTimeout = null;
 let realtimeChannelPrecios = null;
 let realtimeChannelComercios = null;
@@ -309,6 +317,9 @@ let realtimeChannelComercios = null;
 const LOCAL_STORAGE_KEY = 'changocheck_precios_cache';
 const LOCAL_STORAGE_COMERCIOS = 'changocheck_comercios_list';
 const LOCAL_STORAGE_COMERCIO = 'changocheck_last_comercio';
+const LOCAL_STORAGE_CHANGO = 'changocheck_chango_cache';
+const LOCAL_STORAGE_CHANGO_BUDGET = 'changocheck_chango_budget';
+const LOCAL_STORAGE_STOCK = 'changocheck_stock_cache';
 
 const COMERCIOS_DEFAULT = [
   { id: 1, nombre: 'Coto', ubicacion: 'Sucursal Central', descripcion: 'Supermercado e Hipermercado' },
@@ -351,20 +362,46 @@ const kpiTotalProductos = document.getElementById('kpi-total-productos');
 const tabRecientes = document.getElementById('tab-recientes');
 const tabComparador = document.getElementById('tab-comparador');
 const tabComercios = document.getElementById('tab-comercios');
+const tabChango = document.getElementById('tab-chango');
+const tabStock = document.getElementById('tab-stock');
 
 // Vistas
 const viewRecientes = document.getElementById('view-recientes');
 const viewComparador = document.getElementById('view-comparador');
 const viewComercios = document.getElementById('view-comercios');
+const viewChango = document.getElementById('view-chango');
+const viewStock = document.getElementById('view-stock');
 const inputBuscar = document.getElementById('input-buscar');
 
 // Contenedores de Listas
 const contenedorRecientes = document.getElementById('lista-precios');
 const contenedorComparador = document.getElementById('lista-comparador');
 const contenedorComercios = document.getElementById('lista-comercios');
+const contenedorChango = document.getElementById('lista-chango');
+const contenedorStock = document.getElementById('lista-stock');
 const badgePreciosCount = document.getElementById('precios-count');
 const badgeComparadorCount = document.getElementById('comparador-count');
 const badgeComerciosCount = document.getElementById('comercios-count');
+
+// Elementos Vista Mi Chango
+const changoTotalGasto = document.getElementById('chango-total-gasto');
+const changoItemsCount = document.getElementById('chango-items-count');
+const changoUnitsCount = document.getElementById('chango-units-count');
+const inputChangoPresupuesto = document.getElementById('input-chango-presupuesto');
+const changoBudgetProgressWrap = document.getElementById('chango-budget-progress-wrap');
+const changoBudgetBar = document.getElementById('chango-budget-bar');
+const changoBudgetText = document.getElementById('chango-budget-text');
+const btnChangoAgregar = document.getElementById('btn-chango-agregar');
+const btnChangoFinalizar = document.getElementById('btn-chango-finalizar');
+const btnChangoVaciar = document.getElementById('btn-chango-vaciar');
+
+// Elementos Vista Stock Casa
+const btnStockFiltroTodos = document.getElementById('btn-stock-filtro-todos');
+const btnStockFiltroBajo = document.getElementById('btn-stock-filtro-bajo');
+const stockTotalCount = document.getElementById('stock-total-count');
+const stockBajoCount = document.getElementById('stock-bajo-count');
+const stockVisibleCount = document.getElementById('stock-visible-count');
+const btnStockAgregar = document.getElementById('btn-stock-agregar');
 
 // FAB y Modal Bottom Sheet de Precio
 const btnFabCarga = document.getElementById('btn-fab-carga');
@@ -391,6 +428,29 @@ const inputCantidad = document.getElementById('cantidad');
 const selectUnidad = document.getElementById('unidad');
 const previewValor = document.getElementById('precio-unitario-val');
 const btnGuardar = document.getElementById('btn-guardar');
+const btnGuardarText = document.getElementById('btn-guardar-text');
+const checkAgregarChango = document.getElementById('check-agregar-chango');
+const changoExtrasFields = document.getElementById('chango-extras-fields');
+const inputChangoUnidades = document.getElementById('chango-cantidad-unidades');
+const checkActualizarPrecioGondola = document.getElementById('check-actualizar-precio-gondola');
+
+// Modal de Stock Casa
+const modalStockBackdrop = document.getElementById('modal-stock-backdrop');
+const modalStockTitle = document.getElementById('modal-stock-title');
+const btnCerrarModalStock = document.getElementById('btn-cerrar-modal-stock');
+const btnCancelarStock = document.getElementById('btn-cancelar-stock');
+const formStock = document.getElementById('form-stock');
+const stockScannerSection = document.getElementById('stock-scanner-section');
+const btnScanStock = document.getElementById('btn-scan-stock');
+const btnScanStockText = document.getElementById('btn-scan-stock-text');
+const btnCerrarEscanerStock = document.getElementById('btn-cerrar-escaner-stock');
+const inputStockId = document.getElementById('stock-id');
+const inputStockCodigo = document.getElementById('stock-codigo');
+const inputStockProducto = document.getElementById('stock-producto');
+const inputStockCantidad = document.getElementById('stock-cantidad');
+const selectStockUnidad = document.getElementById('stock-unidad');
+const inputStockMinimo = document.getElementById('stock-minimo');
+const selectStockCategoria = document.getElementById('stock-categoria');
 
 // Modal de Comercios
 const modalComercioBackdrop = document.getElementById('modal-comercio-backdrop');
@@ -708,32 +768,73 @@ export function buscarAutocompletadoProducto(codigo) {
   if (!codigo || !codigo.trim()) return;
   const limpio = codigo.trim();
 
-  const coincidencia = listaPrecios.find((item) => item.codigo_barra === limpio);
+  const comercioActual = selectComercio?.value?.trim().toLowerCase();
+  const coincidenciaComercio = comercioActual
+    ? listaPrecios.find((item) => item.codigo_barra === limpio && item.comercio?.trim().toLowerCase() === comercioActual)
+    : null;
+  const coincidencia = coincidenciaComercio || listaPrecios.find((item) => item.codigo_barra === limpio);
+
   if (coincidencia && coincidencia.producto) {
     if (inputProducto) {
       inputProducto.value = coincidencia.producto;
-      mostrarToast(`Autocompletado: ${coincidencia.producto}`, 'info');
     }
+    if (inputPrecio && !inputPrecio.value && coincidencia.precio_total) {
+      inputPrecio.value = coincidencia.precio_total;
+    }
+    if (inputCantidad && coincidencia.cantidad) {
+      inputCantidad.value = coincidencia.cantidad;
+    }
+    if (selectUnidad && coincidencia.unidad) {
+      selectUnidad.value = coincidencia.unidad;
+    }
+    actualizarPreviewUnitario();
+    mostrarToast(`Autocompletado: ${coincidencia.producto}`, 'info');
   }
 }
 
 /* ==========================================================================
    Gestión del Bottom Sheet Modal y FAB
    ========================================================================== */
-export function abrirModalCarga(iniciarCamara = false) {
+export function abrirModalCarga(iniciarCamara = false, opciones = {}) {
   if (!sheetBackdrop) return;
   sheetBackdrop.classList.remove('hidden');
 
   poblarSelectComercios();
+
+  const modoChango = Boolean(opciones.modoChango);
+  if (checkAgregarChango) {
+    checkAgregarChango.checked = modoChango;
+    changoExtrasFields?.classList.toggle('hidden', !modoChango);
+  }
+  if (btnGuardarText) {
+    btnGuardarText.textContent = modoChango ? 'Agregar al Chango' : 'Guardar Precio';
+  }
+  if (inputChangoUnidades) {
+    inputChangoUnidades.value = opciones.unidadesChango || 1;
+  }
+  if (checkActualizarPrecioGondola) {
+    checkActualizarPrecioGondola.checked = true;
+  }
+
+  if (opciones.codigo_barra && inputCodigo) inputCodigo.value = opciones.codigo_barra;
+  if (opciones.producto && inputProducto) inputProducto.value = opciones.producto;
+  if (opciones.precio_total && inputPrecio) inputPrecio.value = opciones.precio_total;
+  if (opciones.cantidad && inputCantidad) inputCantidad.value = opciones.cantidad;
+  if (opciones.unidad && selectUnidad) selectUnidad.value = opciones.unidad;
+  actualizarPreviewUnitario();
 
   if (iniciarCamara) {
     iniciarEscaner();
   } else {
     setTimeout(() => {
       if (selectComercio?.value) {
-        if (inputCodigo) inputCodigo.focus();
-      } else {
-        if (selectComercio) selectComercio.focus();
+        if (opciones.producto && inputPrecio) {
+          inputPrecio.focus();
+        } else if (inputCodigo) {
+          inputCodigo.focus();
+        }
+      } else if (selectComercio) {
+        selectComercio.focus();
       }
     }, 150);
   }
@@ -846,8 +947,46 @@ export async function alternarEscaner() {
 }
 
 /* ==========================================================================
-   Guardado de Precios (Supabase)
+   Guardado de Precios (Supabase) y Sincronización desde Chango
    ========================================================================== */
+export async function registrarPrecioEnBase({ codigo_barra, comercio, producto, precio_total, cantidad, unidad }, silencioso = false) {
+  const { precioUnitario } = normalizarPrecioUnitario(precio_total, cantidad, unidad);
+
+  const nuevoRegistro = {
+    codigo_barra: codigo_barra || null,
+    comercio,
+    producto,
+    precio_total: Number(Number(precio_total).toFixed(2)),
+    cantidad: Number(Number(cantidad).toFixed(3)),
+    unidad,
+    precio_unitario: precioUnitario,
+    ...(usuarioActual?.id ? { user_id: usuarioActual.id } : {})
+  };
+
+  if (supabase && usuarioActual) {
+    const { data, error } = await supabase
+      .from('precios')
+      .insert([nuevoRegistro])
+      .select();
+
+    if (error) throw error;
+    if (data && data[0]) {
+      registrarIdComoPropio(data[0].id);
+      agregarOActualizarRegistro(data[0]);
+    }
+    if (!silencioso) mostrarToast('¡Precio registrado en Supabase!', 'success');
+  } else {
+    const simulado = {
+      ...nuevoRegistro,
+      id: Date.now(),
+      created_at: new Date().toISOString()
+    };
+    registrarIdComoPropio(simulado.id);
+    agregarOActualizarRegistro(simulado);
+    if (!silencioso) mostrarToast('Guardado localmente', 'success');
+  }
+}
+
 export async function guardarPrecio(e) {
   e.preventDefault();
 
@@ -857,66 +996,56 @@ export async function guardarPrecio(e) {
   const precioTotal = parseFloat(inputPrecio?.value);
   const cantidad = parseFloat(inputCantidad?.value);
   const unidad = selectUnidad?.value;
+  const agregarAlChango = Boolean(checkAgregarChango?.checked);
+  const actualizarGondola = !agregarAlChango || Boolean(checkActualizarPrecioGondola?.checked);
+  const unidadesChango = Math.max(1, parseFloat(inputChangoUnidades?.value) || 1);
 
   if (!comercio || !producto || isNaN(precioTotal) || precioTotal <= 0 || isNaN(cantidad) || cantidad <= 0) {
     mostrarToast('Completá los campos obligatorios con valores válidos.', 'error');
     return;
   }
 
-  if (!usuarioActual) {
+  if (!agregarAlChango && !usuarioActual) {
     mostrarToast('Iniciá sesión para registrar precios.', 'info');
     abrirModalAuth();
     return;
   }
 
-  const { precioUnitario } = normalizarPrecioUnitario(precioTotal, cantidad, unidad);
-
-  const nuevoRegistro = {
-    codigo_barra: codigo,
-    comercio,
-    producto,
-    precio_total: Number(precioTotal.toFixed(2)),
-    cantidad: Number(cantidad.toFixed(3)),
-    unidad,
-    precio_unitario: precioUnitario,
-    ...(usuarioActual?.id ? { user_id: usuarioActual.id } : {})
-  };
-
   btnGuardar.disabled = true;
 
   try {
-    if (supabase) {
-      const { data, error } = await supabase
-        .from('precios')
-        .insert([nuevoRegistro])
-        .select();
-
-      if (error) throw error;
-      mostrarToast('¡Precio registrado en Supabase!', 'success');
-      if (data && data[0]) {
-        registrarIdComoPropio(data[0].id);
-        agregarOActualizarRegistro(data[0]);
-      }
-    } else {
-      const simulado = {
-        ...nuevoRegistro,
-        id: Date.now(),
-        created_at: new Date().toISOString()
-      };
-      registrarIdComoPropio(simulado.id);
-      agregarOActualizarRegistro(simulado);
-      mostrarToast('Guardado localmente', 'success');
+    if (agregarAlChango) {
+      await agregarItemAlChango({
+        comercio,
+        codigo_barra: codigo,
+        producto,
+        precio_total: Number(precioTotal.toFixed(2)),
+        cantidad_pack: Number(cantidad.toFixed(3)),
+        unidad,
+        cantidad_chango: unidadesChango,
+        actualizarPrecio: actualizarGondola
+      });
+    } else if (actualizarGondola) {
+      await registrarPrecioEnBase({
+        codigo_barra: codigo,
+        comercio,
+        producto,
+        precio_total: precioTotal,
+        cantidad,
+        unidad
+      });
     }
 
     // Regla US-04 / CA-05: Conservar el comercio seleccionado
     try {
       localStorage.setItem(LOCAL_STORAGE_COMERCIO, comercio);
-    } catch (e) {}
+    } catch (err) {}
 
     if (inputCodigo) inputCodigo.value = '';
     if (inputProducto) inputProducto.value = '';
     if (inputPrecio) inputPrecio.value = '';
     if (inputCantidad) inputCantidad.value = '1';
+    if (inputChangoUnidades) inputChangoUnidades.value = '1';
     actualizarPreviewUnitario();
 
     await cerrarModalCarga();
@@ -1067,8 +1196,8 @@ export function suscribirRealtime() {
 export function cambiarVista(nuevaVista) {
   vistaActual = nuevaVista;
 
-  [tabRecientes, tabComparador, tabComercios].forEach((tab) => tab?.classList.remove('active'));
-  [viewRecientes, viewComparador, viewComercios].forEach((v) => v?.classList.add('hidden'));
+  [tabRecientes, tabComparador, tabComercios, tabChango, tabStock].forEach((tab) => tab?.classList.remove('active'));
+  [viewRecientes, viewComparador, viewComercios, viewChango, viewStock].forEach((v) => v?.classList.add('hidden'));
 
   if (nuevaVista === 'recientes') {
     tabRecientes?.classList.add('active');
@@ -1079,6 +1208,12 @@ export function cambiarVista(nuevaVista) {
   } else if (nuevaVista === 'comercios') {
     tabComercios?.classList.add('active');
     viewComercios?.classList.remove('hidden');
+  } else if (nuevaVista === 'chango') {
+    tabChango?.classList.add('active');
+    viewChango?.classList.remove('hidden');
+  } else if (nuevaVista === 'stock') {
+    tabStock?.classList.add('active');
+    viewStock?.classList.remove('hidden');
   }
 
   renderizarDashboard();
@@ -1103,6 +1238,10 @@ export function renderizarDashboard() {
     renderizarComparador();
   } else if (vistaActual === 'comercios') {
     renderizarPorComercio();
+  } else if (vistaActual === 'chango') {
+    renderizarChango();
+  } else if (vistaActual === 'stock') {
+    renderizarStock();
   }
 }
 
@@ -1387,6 +1526,822 @@ export function renderizarPorComercio() {
 }
 
 /* ==========================================================================
+   Vista 4: Mi Chango (Carrito, Control de Gasto y Actualización de Precios)
+   ========================================================================== */
+function guardarChangoLocal() {
+  try {
+    localStorage.setItem(LOCAL_STORAGE_CHANGO, JSON.stringify(listaChango));
+  } catch (e) {}
+}
+
+function recuperarChangoLocal() {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_CHANGO);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+export async function cargarChangoInicial() {
+  listaChango = recuperarChangoLocal();
+  try {
+    const budgetRaw = localStorage.getItem(LOCAL_STORAGE_CHANGO_BUDGET);
+    presupuestoChango = budgetRaw ? parseFloat(budgetRaw) || 0 : 0;
+    if (inputChangoPresupuesto && presupuestoChango > 0) {
+      inputChangoPresupuesto.value = presupuestoChango;
+    }
+  } catch (e) {}
+
+  if (vistaActual === 'chango') renderizarChango();
+
+  if (!supabase || !usuarioActual) return;
+
+  try {
+    const { data, error } = await supabase
+      .from('chango_items')
+      .select('*')
+      .eq('user_id', usuarioActual.id)
+      .order('created_at', { ascending: false });
+
+    if (!error && data) {
+      listaChango = data;
+      guardarChangoLocal();
+      if (vistaActual === 'chango') renderizarChango();
+    }
+  } catch (err) {
+    console.warn('Aviso cargando chango desde Supabase (usando caché local):', err);
+  }
+}
+
+export async function sincronizarPrecioDesdeChango({ codigo_barra, comercio, producto, precio_total, cantidad, unidad }) {
+  const prodNorm = producto.trim().toLowerCase();
+  const comNorm = comercio.trim().toLowerCase();
+  const precioNum = Number(Number(precio_total).toFixed(2));
+
+  const yaExisteIgual = listaPrecios.some((p) =>
+    p.producto?.trim().toLowerCase() === prodNorm &&
+    p.comercio?.trim().toLowerCase() === comNorm &&
+    Number(p.precio_total) === precioNum
+  );
+
+  if (yaExisteIgual) return false;
+
+  await registrarPrecioEnBase({
+    codigo_barra,
+    comercio,
+    producto,
+    precio_total: precioNum,
+    cantidad,
+    unidad
+  }, true);
+  return true;
+}
+
+export async function agregarItemAlChango({
+  comercio,
+  codigo_barra = null,
+  producto,
+  precio_total,
+  cantidad_pack = 1,
+  unidad = 'un',
+  cantidad_chango = 1,
+  actualizarPrecio = true
+}) {
+  const prodNorm = producto.trim().toLowerCase();
+  const comNorm = comercio.trim().toLowerCase();
+  const precioNum = Number(Number(precio_total).toFixed(2));
+
+  const existente = listaChango.find((item) =>
+    item.producto?.trim().toLowerCase() === prodNorm &&
+    item.comercio?.trim().toLowerCase() === comNorm &&
+    Number(item.precio_total) === precioNum
+  );
+
+  if (existente) {
+    await actualizarCantidadChango(existente.id, cantidad_chango);
+    if (actualizarPrecio) {
+      try {
+        await sincronizarPrecioDesdeChango({ codigo_barra, comercio, producto, precio_total: precioNum, cantidad: cantidad_pack, unidad });
+      } catch (e) {
+        console.warn('No se pudo sincronizar precio:', e);
+      }
+    }
+    return;
+  }
+
+  const nuevoItem = {
+    comercio,
+    codigo_barra: codigo_barra || null,
+    producto: producto.trim(),
+    precio_total: precioNum,
+    cantidad_pack: Number(Number(cantidad_pack).toFixed(3)),
+    unidad,
+    cantidad_chango: Number(Number(cantidad_chango).toFixed(3)),
+    comprado: true
+  };
+
+  if (supabase && usuarioActual) {
+    try {
+      const { data, error } = await supabase
+        .from('chango_items')
+        .insert([{ ...nuevoItem, user_id: usuarioActual.id }])
+        .select();
+
+      if (error) throw error;
+      if (data && data[0]) {
+        listaChango.unshift(data[0]);
+      }
+    } catch (err) {
+      console.warn('Guardando ítem de chango localmente:', err);
+      listaChango.unshift({ ...nuevoItem, id: 'local-' + Date.now(), created_at: new Date().toISOString() });
+    }
+  } else {
+    listaChango.unshift({ ...nuevoItem, id: 'local-' + Date.now(), created_at: new Date().toISOString() });
+  }
+
+  guardarChangoLocal();
+
+  let precioActualizado = false;
+  if (actualizarPrecio) {
+    try {
+      precioActualizado = await sincronizarPrecioDesdeChango({
+        codigo_barra,
+        comercio,
+        producto,
+        precio_total: precioNum,
+        cantidad: cantidad_pack,
+        unidad
+      });
+    } catch (e) {
+      console.warn('No se pudo actualizar precio en Supabase:', e);
+    }
+  }
+
+  if (vistaActual === 'chango') renderizarChango();
+  mostrarToast(
+    precioActualizado
+      ? `"${producto}" agregado al chango y precio actualizado`
+      : `"${producto}" agregado al chango`,
+    'success'
+  );
+}
+
+export async function actualizarCantidadChango(id, delta) {
+  const index = listaChango.findIndex((item) => String(item.id) === String(id));
+  if (index < 0) return;
+
+  const nuevaCant = Number((Number(listaChango[index].cantidad_chango) + delta).toFixed(3));
+  if (nuevaCant <= 0) {
+    await eliminarItemChango(id);
+    return;
+  }
+
+  listaChango[index].cantidad_chango = nuevaCant;
+  guardarChangoLocal();
+  if (vistaActual === 'chango') renderizarChango();
+
+  if (supabase && usuarioActual && !String(id).startsWith('local-')) {
+    try {
+      await supabase
+        .from('chango_items')
+        .update({ cantidad_chango: nuevaCant, updated_at: new Date().toISOString() })
+        .eq('id', id);
+    } catch (e) {
+      console.warn('Error actualizando cantidad en Supabase:', e);
+    }
+  }
+}
+
+export async function editarPrecioItemChango(id) {
+  const item = listaChango.find((i) => String(i.id) === String(id));
+  if (!item) return;
+
+  const entrada = prompt(`Nuevo precio para "${item.producto}" ($):`, item.precio_total);
+  if (entrada === null) return;
+
+  const nuevoPrecio = parseFloat(entrada.replace(',', '.'));
+  if (isNaN(nuevoPrecio) || nuevoPrecio <= 0) {
+    mostrarToast('Ingresá un precio válido mayor a 0.', 'error');
+    return;
+  }
+
+  item.precio_total = Number(nuevoPrecio.toFixed(2));
+  guardarChangoLocal();
+  renderizarChango();
+
+  if (supabase && usuarioActual && !String(id).startsWith('local-')) {
+    try {
+      await supabase
+        .from('chango_items')
+        .update({ precio_total: item.precio_total, updated_at: new Date().toISOString() })
+        .eq('id', id);
+    } catch (e) {
+      console.warn('Error actualizando precio de chango en Supabase:', e);
+    }
+  }
+
+  try {
+    await sincronizarPrecioDesdeChango({
+      codigo_barra: item.codigo_barra,
+      comercio: item.comercio,
+      producto: item.producto,
+      precio_total: item.precio_total,
+      cantidad: item.cantidad_pack || 1,
+      unidad: item.unidad || 'un'
+    });
+    mostrarToast('Precio del chango y base de góndola actualizados', 'success');
+  } catch (e) {
+    mostrarToast('Precio actualizado en el chango', 'success');
+  }
+}
+
+export async function eliminarItemChango(id) {
+  listaChango = listaChango.filter((item) => String(item.id) !== String(id));
+  guardarChangoLocal();
+  if (vistaActual === 'chango') renderizarChango();
+
+  if (supabase && usuarioActual && !String(id).startsWith('local-')) {
+    try {
+      await supabase.from('chango_items').delete().eq('id', id);
+    } catch (e) {
+      console.warn('Error eliminando ítem de chango en Supabase:', e);
+    }
+  }
+}
+
+export async function vaciarChango(pedirConfirmacion = true) {
+  if (listaChango.length === 0) return;
+  if (pedirConfirmacion && !confirm('¿Vaciar todos los productos del chango?')) return;
+
+  listaChango = [];
+  guardarChangoLocal();
+  if (vistaActual === 'chango') renderizarChango();
+
+  if (supabase && usuarioActual) {
+    try {
+      await supabase.from('chango_items').delete().eq('user_id', usuarioActual.id);
+    } catch (e) {
+      console.warn('Error vaciando chango en Supabase:', e);
+    }
+  }
+  if (pedirConfirmacion) mostrarToast('Chango vaciado', 'info');
+}
+
+export async function finalizarCompraChango() {
+  if (listaChango.length === 0) {
+    mostrarToast('Tu chango está vacío.', 'info');
+    return;
+  }
+
+  const totalGastado = listaChango.reduce((acc, item) => acc + (Number(item.precio_total) * Number(item.cantidad_chango)), 0);
+  const totalFmt = totalGastado.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const pasarAStock = confirm(
+    `Total de la compra: $${totalFmt}\n\n¿Querés sumar estos ${listaChango.length} productos a tu Stock en Casa y vaciar el chango?`
+  );
+
+  if (!pasarAStock) return;
+
+  for (const item of listaChango) {
+    const sumaCantidad = item.unidad === 'un'
+      ? Number(item.cantidad_chango)
+      : Number((Number(item.cantidad_chango) * Number(item.cantidad_pack || 1)).toFixed(3));
+
+    await sumarOActualizarEnStock({
+      codigo_barra: item.codigo_barra,
+      producto: item.producto,
+      cantidad: sumaCantidad,
+      unidad: item.unidad || 'un'
+    });
+  }
+
+  await vaciarChango(false);
+  mostrarToast(`¡Compra finalizada ($${totalFmt})! Productos sumados al Stock Casa.`, 'success');
+}
+
+export function renderizarChango() {
+  if (!contenedorChango) return;
+
+  const termino = inputBuscar?.value.trim().toLowerCase() || '';
+  const filtrados = listaChango.filter((item) => {
+    if (!termino) return true;
+    return (
+      item.producto?.toLowerCase().includes(termino) ||
+      item.comercio?.toLowerCase().includes(termino) ||
+      item.codigo_barra?.toLowerCase().includes(termino)
+    );
+  });
+
+  const totalGasto = listaChango.reduce(
+    (acc, item) => acc + (Number(item.precio_total) * Number(item.cantidad_chango)),
+    0
+  );
+  const totalUnidades = listaChango.reduce((acc, item) => acc + Number(item.cantidad_chango), 0);
+
+  if (changoTotalGasto) {
+    changoTotalGasto.textContent = `$${totalGasto.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+  if (changoItemsCount) {
+    changoItemsCount.textContent = `${listaChango.length} ${listaChango.length === 1 ? 'ítem' : 'ítems'}`;
+  }
+  if (changoUnitsCount) {
+    changoUnitsCount.textContent = `${totalUnidades} ${totalUnidades === 1 ? 'unidad' : 'unidades'}`;
+  }
+
+  // Barra de presupuesto
+  if (changoBudgetProgressWrap && changoBudgetBar && changoBudgetText) {
+    if (presupuestoChango > 0) {
+      changoBudgetProgressWrap.classList.remove('hidden');
+      const pct = Math.min(100, Math.round((totalGasto / presupuestoChango) * 100));
+      const restante = presupuestoChango - totalGasto;
+
+      changoBudgetBar.style.width = `${pct}%`;
+      changoBudgetBar.classList.remove('warning', 'danger');
+      if (totalGasto > presupuestoChango) {
+        changoBudgetBar.classList.add('danger');
+        const excesoFmt = Math.abs(restante).toLocaleString('es-AR', { minimumFractionDigits: 2 });
+        changoBudgetText.textContent = `Excedido por $${excesoFmt} (${Math.round((totalGasto / presupuestoChango) * 100)}%)`;
+      } else {
+        if (pct >= 80) changoBudgetBar.classList.add('warning');
+        const restFmt = restante.toLocaleString('es-AR', { minimumFractionDigits: 2 });
+        changoBudgetText.textContent = `${pct}% usado · Quedan $${restFmt}`;
+      }
+    } else {
+      changoBudgetProgressWrap.classList.add('hidden');
+    }
+  }
+
+  if (filtrados.length === 0) {
+    contenedorChango.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">🛒</div>
+        <p class="empty-title">${termino ? 'Sin coincidencias en tu chango' : 'Tu chango está vacío'}</p>
+        <p class="empty-desc">Tocá "+ Agregar al Chango" para escanear o cargar lo que vas poniendo en el carrito.</p>
+      </div>
+    `;
+    return;
+  }
+
+  contenedorChango.innerHTML = filtrados.map((item) => {
+    const subtotal = Number(item.precio_total) * Number(item.cantidad_chango);
+    const subtotalFmt = subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const unitFmt = Number(item.precio_total).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    return `
+      <article class="chango-item-card" data-chango-id="${item.id}">
+        <div class="chango-item-top">
+          <div>
+            <h3 class="chango-item-title">${escapeHTML(item.producto)}</h3>
+            <div class="price-card-badges">
+              <span class="badge-comercio">${escapeHTML(item.comercio)}</span>
+              ${item.codigo_barra ? `<span class="badge-codigo">#${escapeHTML(item.codigo_barra)}</span>` : ''}
+            </div>
+          </div>
+          <button type="button" class="btn-delete-item btn-chango-del" data-id="${item.id}" title="Quitar del chango">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+          </button>
+        </div>
+
+        <div class="chango-item-bottom">
+          <div class="chango-price-edit-wrap">
+            <span class="chango-subtotal">$${subtotalFmt}</span>
+            <span class="chango-unit-detail">$${unitFmt} c/u (${item.cantidad_pack || 1} ${item.unidad || 'un'})</span>
+          </div>
+
+          <div class="stock-card-actions">
+            <button type="button" class="btn-inline-edit btn-chango-edit-price" data-id="${item.id}" title="Corregir precio y actualizar góndola">
+              ✏️ Precio
+            </button>
+            <div class="stepper-control">
+              <button type="button" class="stepper-btn btn-chango-dec" data-id="${item.id}" aria-label="Restar unidad">−</button>
+              <span class="stepper-val">${item.cantidad_chango}</span>
+              <button type="button" class="stepper-btn btn-chango-inc" data-id="${item.id}" aria-label="Sumar unidad">+</button>
+            </div>
+          </div>
+        </div>
+      </article>
+    `;
+  }).join('');
+
+  contenedorChango.querySelectorAll('.btn-chango-inc').forEach((btn) => {
+    btn.addEventListener('click', () => actualizarCantidadChango(btn.getAttribute('data-id'), 1));
+  });
+  contenedorChango.querySelectorAll('.btn-chango-dec').forEach((btn) => {
+    btn.addEventListener('click', () => actualizarCantidadChango(btn.getAttribute('data-id'), -1));
+  });
+  contenedorChango.querySelectorAll('.btn-chango-del').forEach((btn) => {
+    btn.addEventListener('click', () => eliminarItemChango(btn.getAttribute('data-id')));
+  });
+  contenedorChango.querySelectorAll('.btn-chango-edit-price').forEach((btn) => {
+    btn.addEventListener('click', () => editarPrecioItemChango(btn.getAttribute('data-id')));
+  });
+}
+
+/* ==========================================================================
+   Vista 5: Stock Casa (Inventario del Hogar)
+   ========================================================================== */
+function guardarStockLocal() {
+  try {
+    localStorage.setItem(LOCAL_STORAGE_STOCK, JSON.stringify(listaStock));
+  } catch (e) {}
+}
+
+function recuperarStockLocal() {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_STOCK);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+export async function cargarStockInicial() {
+  listaStock = recuperarStockLocal();
+  if (vistaActual === 'stock') renderizarStock();
+
+  if (!supabase || !usuarioActual) return;
+
+  try {
+    const { data, error } = await supabase
+      .from('stock_casa')
+      .select('*')
+      .eq('user_id', usuarioActual.id)
+      .order('producto', { ascending: true });
+
+    if (!error && data) {
+      listaStock = data;
+      guardarStockLocal();
+      if (vistaActual === 'stock') renderizarStock();
+    }
+  } catch (err) {
+    console.warn('Aviso cargando stock desde Supabase (usando caché local):', err);
+  }
+}
+
+export async function sumarOActualizarEnStock({ codigo_barra = null, producto, cantidad, unidad = 'un' }) {
+  const prodNorm = producto.trim().toLowerCase();
+  const existente = listaStock.find((s) =>
+    (codigo_barra && s.codigo_barra && s.codigo_barra === codigo_barra) ||
+    s.producto?.trim().toLowerCase() === prodNorm
+  );
+
+  if (existente) {
+    const nuevaCant = Number((Number(existente.cantidad) + Number(cantidad)).toFixed(3));
+    existente.cantidad = nuevaCant;
+    guardarStockLocal();
+    if (supabase && usuarioActual && !String(existente.id).startsWith('local-')) {
+      try {
+        await supabase
+          .from('stock_casa')
+          .update({ cantidad: nuevaCant, updated_at: new Date().toISOString() })
+          .eq('id', existente.id);
+      } catch (e) {}
+    }
+    return;
+  }
+
+  const nuevoStock = {
+    codigo_barra,
+    producto: producto.trim(),
+    cantidad: Number(Number(cantidad).toFixed(3)),
+    unidad,
+    stock_minimo: 1,
+    categoria: 'General'
+  };
+
+  if (supabase && usuarioActual) {
+    try {
+      const { data, error } = await supabase
+        .from('stock_casa')
+        .insert([{ ...nuevoStock, user_id: usuarioActual.id }])
+        .select();
+      if (!error && data && data[0]) {
+        listaStock.push(data[0]);
+        guardarStockLocal();
+        return;
+      }
+    } catch (e) {}
+  }
+
+  listaStock.push({ ...nuevoStock, id: 'local-' + Date.now(), created_at: new Date().toISOString() });
+  guardarStockLocal();
+}
+
+export function abrirModalStock(itemEditar = null) {
+  if (!modalStockBackdrop) return;
+
+  if (itemEditar) {
+    if (modalStockTitle) modalStockTitle.textContent = 'Editar Producto en Stock';
+    if (inputStockId) inputStockId.value = itemEditar.id || '';
+    if (inputStockCodigo) inputStockCodigo.value = itemEditar.codigo_barra || '';
+    if (inputStockProducto) inputStockProducto.value = itemEditar.producto || '';
+    if (inputStockCantidad) inputStockCantidad.value = itemEditar.cantidad ?? 1;
+    if (selectStockUnidad) selectStockUnidad.value = itemEditar.unidad || 'un';
+    if (inputStockMinimo) inputStockMinimo.value = itemEditar.stock_minimo ?? 1;
+    if (selectStockCategoria) selectStockCategoria.value = itemEditar.categoria || 'General';
+  } else {
+    if (modalStockTitle) modalStockTitle.textContent = 'Agregar al Stock';
+    formStock?.reset();
+    if (inputStockId) inputStockId.value = '';
+    if (inputStockCantidad) inputStockCantidad.value = '1';
+    if (inputStockMinimo) inputStockMinimo.value = '1';
+    if (selectStockCategoria) selectStockCategoria.value = 'General';
+  }
+
+  modalStockBackdrop.classList.remove('hidden');
+  setTimeout(() => inputStockProducto?.focus(), 150);
+}
+
+export async function cerrarModalStock() {
+  if (escanerStockActivo) {
+    await detenerEscanerStock();
+  }
+  modalStockBackdrop?.classList.add('hidden');
+  formStock?.reset();
+}
+
+export async function iniciarEscanerStock() {
+  if (escanerStockActivo) return;
+  if (typeof Html5Qrcode === 'undefined') {
+    mostrarToast('Librería de escaneo no disponible.', 'error');
+    return;
+  }
+
+  try {
+    stockScannerSection?.classList.remove('hidden');
+    if (btnScanStockText) btnScanStockText.textContent = 'Cerrar visor';
+    escanerStockActivo = true;
+
+    if (!html5QrCodeStock) {
+      html5QrCodeStock = new Html5Qrcode('reader-stock');
+    }
+
+    const config = { fps: 10, qrbox: { width: 240, height: 150 }, aspectRatio: 1.0 };
+    const onSuccess = async (decodedText) => {
+      ejecutarFeedbackHaptico();
+      if (inputStockCodigo) inputStockCodigo.value = decodedText;
+      const match = listaPrecios.find((p) => p.codigo_barra === decodedText);
+      if (match && inputStockProducto && !inputStockProducto.value) {
+        inputStockProducto.value = match.producto;
+        if (selectStockUnidad && match.unidad) selectStockUnidad.value = match.unidad;
+      }
+      mostrarToast(`Código detectado: ${decodedText}`, 'success');
+      await detenerEscanerStock();
+      inputStockProducto?.focus();
+    };
+
+    try {
+      await html5QrCodeStock.start({ facingMode: 'environment' }, config, onSuccess, () => {});
+    } catch {
+      await html5QrCodeStock.start({ facingMode: 'user' }, config, onSuccess, () => {});
+    }
+  } catch (err) {
+    mostrarToast('No se pudo abrir la cámara.', 'error');
+    await detenerEscanerStock();
+  }
+}
+
+export async function detenerEscanerStock() {
+  if (html5QrCodeStock) {
+    try {
+      if (html5QrCodeStock.isScanning) await html5QrCodeStock.stop();
+      html5QrCodeStock.clear();
+    } catch (e) {}
+  }
+  stockScannerSection?.classList.add('hidden');
+  if (btnScanStockText) btnScanStockText.textContent = 'Escanear';
+  escanerStockActivo = false;
+}
+
+export async function guardarItemStock(e) {
+  e.preventDefault();
+
+  const id = inputStockId?.value.trim();
+  const codigo_barra = inputStockCodigo?.value.trim() || null;
+  const producto = inputStockProducto?.value.trim();
+  const cantidad = parseFloat(inputStockCantidad?.value);
+  const unidad = selectStockUnidad?.value || 'un';
+  const stock_minimo = parseFloat(inputStockMinimo?.value) || 0;
+  const categoria = selectStockCategoria?.value || 'General';
+
+  if (!producto || isNaN(cantidad) || cantidad < 0) {
+    mostrarToast('Ingresá un nombre de producto y una cantidad válida.', 'error');
+    return;
+  }
+
+  const datos = {
+    codigo_barra,
+    producto,
+    cantidad: Number(cantidad.toFixed(3)),
+    unidad,
+    stock_minimo: Number(stock_minimo.toFixed(3)),
+    categoria,
+    updated_at: new Date().toISOString()
+  };
+
+  try {
+    if (supabase && usuarioActual) {
+      if (id && !id.startsWith('local-')) {
+        const { error } = await supabase.from('stock_casa').update(datos).eq('id', id);
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase
+          .from('stock_casa')
+          .insert([{ ...datos, user_id: usuarioActual.id }])
+          .select();
+        if (error) throw error;
+        if (data && data[0]) datos.id = data[0].id;
+      }
+    }
+
+    const idx = listaStock.findIndex((s) => (id && String(s.id) === String(id)));
+    if (idx >= 0) {
+      listaStock[idx] = { ...listaStock[idx], ...datos };
+    } else {
+      listaStock.push({ id: datos.id || 'local-' + Date.now(), ...datos });
+    }
+
+    guardarStockLocal();
+    await cerrarModalStock();
+    if (vistaActual === 'stock') renderizarStock();
+    mostrarToast(`"${producto}" guardado en tu stock`, 'success');
+  } catch (err) {
+    console.warn('Error guardando stock en Supabase (guardado local):', err);
+    const idx = listaStock.findIndex((s) => (id && String(s.id) === String(id)));
+    if (idx >= 0) {
+      listaStock[idx] = { ...listaStock[idx], ...datos };
+    } else {
+      listaStock.push({ id: 'local-' + Date.now(), ...datos });
+    }
+    guardarStockLocal();
+    await cerrarModalStock();
+    if (vistaActual === 'stock') renderizarStock();
+    mostrarToast(`"${producto}" guardado localmente`, 'success');
+  }
+}
+
+export async function ajustarCantidadStock(id, delta) {
+  const item = listaStock.find((s) => String(s.id) === String(id));
+  if (!item) return;
+
+  const nuevaCant = Math.max(0, Number((Number(item.cantidad) + delta).toFixed(3)));
+  item.cantidad = nuevaCant;
+  guardarStockLocal();
+  if (vistaActual === 'stock') renderizarStock();
+
+  if (supabase && usuarioActual && !String(id).startsWith('local-')) {
+    try {
+      await supabase
+        .from('stock_casa')
+        .update({ cantidad: nuevaCant, updated_at: new Date().toISOString() })
+        .eq('id', id);
+    } catch (e) {}
+  }
+}
+
+export async function eliminarItemStock(id) {
+  if (!confirm('¿Eliminar este producto de tu Stock en Casa?')) return;
+  listaStock = listaStock.filter((s) => String(s.id) !== String(id));
+  guardarStockLocal();
+  if (vistaActual === 'stock') renderizarStock();
+
+  if (supabase && usuarioActual && !String(id).startsWith('local-')) {
+    try {
+      await supabase.from('stock_casa').delete().eq('id', id);
+    } catch (e) {}
+  }
+  mostrarToast('Producto eliminado del stock', 'info');
+}
+
+export function enviarStockAChango(id) {
+  const item = listaStock.find((s) => String(s.id) === String(id));
+  if (!item) return;
+
+  const precioConocido = listaPrecios.find((p) =>
+    (item.codigo_barra && p.codigo_barra === item.codigo_barra) ||
+    p.producto?.trim().toLowerCase() === item.producto?.trim().toLowerCase()
+  );
+
+  abrirModalCarga(false, {
+    modoChango: true,
+    codigo_barra: item.codigo_barra || '',
+    producto: item.producto,
+    precio_total: precioConocido?.precio_total || '',
+    cantidad: precioConocido?.cantidad || 1,
+    unidad: item.unidad || precioConocido?.unidad || 'un',
+    unidadesChango: 1
+  });
+}
+
+export function renderizarStock() {
+  if (!contenedorStock) return;
+
+  const termino = inputBuscar?.value.trim().toLowerCase() || '';
+  const totalCount = listaStock.length;
+  const bajosCount = listaStock.filter((s) => Number(s.cantidad) <= Number(s.stock_minimo)).length;
+
+  if (stockTotalCount) stockTotalCount.textContent = totalCount;
+  if (stockBajoCount) stockBajoCount.textContent = bajosCount;
+
+  const filtrados = listaStock
+    .filter((item) => {
+      if (filtroStock === 'bajo' && Number(item.cantidad) > Number(item.stock_minimo)) {
+        return false;
+      }
+      if (!termino) return true;
+      return (
+        item.producto?.toLowerCase().includes(termino) ||
+        item.categoria?.toLowerCase().includes(termino) ||
+        item.codigo_barra?.toLowerCase().includes(termino)
+      );
+    })
+    .sort((a, b) => a.producto.localeCompare(b.producto));
+
+  if (stockVisibleCount) {
+    stockVisibleCount.textContent = `${filtrados.length} ${filtrados.length === 1 ? 'producto' : 'productos'}`;
+  }
+
+  if (filtrados.length === 0) {
+    contenedorStock.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">${filtroStock === 'bajo' ? '✅' : '🏠'}</div>
+        <p class="empty-title">${filtroStock === 'bajo' ? '¡Todo con buen stock!' : 'Sin productos en Stock Casa'}</p>
+        <p class="empty-desc">${filtroStock === 'bajo' ? 'No tenés productos por debajo del mínimo.' : 'Tocá "+ Agregar" para registrar lo que tenés en tu alacena o heladera.'}</p>
+      </div>
+    `;
+    return;
+  }
+
+  contenedorStock.innerHTML = filtrados.map((item) => {
+    const cant = Number(item.cantidad);
+    const min = Number(item.stock_minimo);
+    const sinStock = cant <= 0;
+    const stockBajo = !sinStock && cant <= min;
+
+    return `
+      <article class="stock-card ${sinStock ? 'out-stock' : stockBajo ? 'low-stock' : ''}" data-stock-id="${item.id}">
+        <div class="stock-card-top">
+          <div>
+            <h3 class="stock-card-title">${escapeHTML(item.producto)}</h3>
+            <div class="price-card-badges">
+              <span class="badge-categoria">${escapeHTML(item.categoria || 'General')}</span>
+              ${sinStock ? '<span class="badge-out-stock">❌ Sin stock</span>' : ''}
+              ${stockBajo ? '<span class="badge-low-stock">⚠️ Stock bajo</span>' : ''}
+              ${item.codigo_barra ? `<span class="badge-codigo">#${escapeHTML(item.codigo_barra)}</span>` : ''}
+            </div>
+          </div>
+          <div class="stock-card-actions">
+            <button type="button" class="btn-inline-edit btn-stock-edit" data-id="${item.id}" title="Editar producto">✏️</button>
+            <button type="button" class="btn-delete-item btn-stock-del" data-id="${item.id}" title="Eliminar del stock">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="stock-card-bottom">
+          <div class="stepper-control">
+            <button type="button" class="stepper-btn btn-stock-dec" data-id="${item.id}" aria-label="Descontar">−</button>
+            <span class="stepper-val">${cant} ${escapeHTML(item.unidad)}</span>
+            <button type="button" class="stepper-btn btn-stock-inc" data-id="${item.id}" aria-label="Sumar">+</button>
+          </div>
+
+          <button type="button" class="btn-stock-to-chango" data-id="${item.id}" title="Mandar al chango de compras">
+            🛒 Al Chango
+          </button>
+        </div>
+      </article>
+    `;
+  }).join('');
+
+  contenedorStock.querySelectorAll('.btn-stock-inc').forEach((btn) => {
+    btn.addEventListener('click', () => ajustarCantidadStock(btn.getAttribute('data-id'), 1));
+  });
+  contenedorStock.querySelectorAll('.btn-stock-dec').forEach((btn) => {
+    btn.addEventListener('click', () => ajustarCantidadStock(btn.getAttribute('data-id'), -1));
+  });
+  contenedorStock.querySelectorAll('.btn-stock-del').forEach((btn) => {
+    btn.addEventListener('click', () => eliminarItemStock(btn.getAttribute('data-id')));
+  });
+  contenedorStock.querySelectorAll('.btn-stock-edit').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.getAttribute('data-id');
+      const found = listaStock.find((s) => String(s.id) === String(id));
+      if (found) abrirModalStock(found);
+    });
+  });
+  contenedorStock.querySelectorAll('.btn-stock-to-chango').forEach((btn) => {
+    btn.addEventListener('click', () => enviarStockAChango(btn.getAttribute('data-id')));
+  });
+}
+
+/* ==========================================================================
    Inicialización de Eventos del DOM
    ========================================================================== */
 document.addEventListener('DOMContentLoaded', () => {
@@ -1394,6 +2349,8 @@ document.addEventListener('DOMContentLoaded', () => {
   tabRecientes?.addEventListener('click', () => cambiarVista('recientes'));
   tabComparador?.addEventListener('click', () => cambiarVista('comparador'));
   tabComercios?.addEventListener('click', () => cambiarVista('comercios'));
+  tabChango?.addEventListener('click', () => cambiarVista('chango'));
+  tabStock?.addEventListener('click', () => cambiarVista('stock'));
 
   // Buscador reactivo
   inputBuscar?.addEventListener('input', () => renderizarDashboard());
@@ -1413,6 +2370,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Apertura y Cierre del Bottom Sheet Modal de Precios
   btnFabCarga?.addEventListener('click', () => {
+    if (vistaActual === 'chango') {
+      abrirModalCarga(false, { modoChango: true });
+      return;
+    }
+    if (vistaActual === 'stock') {
+      abrirModalStock(null);
+      return;
+    }
     if (!usuarioActual) {
       mostrarToast('Iniciá sesión para registrar precios', 'info');
       abrirModalAuth();
@@ -1422,6 +2387,10 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   btnBannerScan?.addEventListener('click', () => {
+    if (vistaActual === 'chango') {
+      abrirModalCarga(true, { modoChango: true });
+      return;
+    }
     if (!usuarioActual) {
       mostrarToast('Iniciá sesión para escanear y registrar precios', 'info');
       abrirModalAuth();
@@ -1434,6 +2403,63 @@ document.addEventListener('DOMContentLoaded', () => {
 
   sheetBackdrop?.addEventListener('click', (e) => {
     if (e.target === sheetBackdrop) cerrarModalCarga();
+  });
+
+  // Toggle de Chango dentro del Modal de Precios
+  checkAgregarChango?.addEventListener('change', (e) => {
+    const activo = e.target.checked;
+    changoExtrasFields?.classList.toggle('hidden', !activo);
+    if (btnGuardarText) {
+      btnGuardarText.textContent = activo ? 'Agregar al Chango' : 'Guardar Precio';
+    }
+  });
+
+  // Eventos Vista Mi Chango
+  btnChangoAgregar?.addEventListener('click', () => abrirModalCarga(false, { modoChango: true }));
+  btnChangoFinalizar?.addEventListener('click', finalizarCompraChango);
+  btnChangoVaciar?.addEventListener('click', () => vaciarChango(true));
+  inputChangoPresupuesto?.addEventListener('input', (e) => {
+    const val = parseFloat(e.target.value);
+    presupuestoChango = isNaN(val) || val <= 0 ? 0 : val;
+    try {
+      localStorage.setItem(LOCAL_STORAGE_CHANGO_BUDGET, String(presupuestoChango));
+    } catch (err) {}
+    renderizarChango();
+  });
+
+  // Eventos Vista Stock Casa y Modal Stock
+  btnStockFiltroTodos?.addEventListener('click', () => {
+    filtroStock = 'todos';
+    btnStockFiltroTodos.classList.add('active');
+    btnStockFiltroBajo?.classList.remove('active');
+    renderizarStock();
+  });
+  btnStockFiltroBajo?.addEventListener('click', () => {
+    filtroStock = 'bajo';
+    btnStockFiltroBajo.classList.add('active');
+    btnStockFiltroTodos?.classList.remove('active');
+    renderizarStock();
+  });
+  btnStockAgregar?.addEventListener('click', () => abrirModalStock(null));
+  btnCerrarModalStock?.addEventListener('click', cerrarModalStock);
+  btnCancelarStock?.addEventListener('click', cerrarModalStock);
+  formStock?.addEventListener('submit', guardarItemStock);
+  modalStockBackdrop?.addEventListener('click', (e) => {
+    if (e.target === modalStockBackdrop) cerrarModalStock();
+  });
+  btnScanStock?.addEventListener('click', () => {
+    if (escanerStockActivo) detenerEscanerStock();
+    else iniciarEscanerStock();
+  });
+  btnCerrarEscanerStock?.addEventListener('click', detenerEscanerStock);
+  inputStockCodigo?.addEventListener('input', (e) => {
+    const limpio = e.target.value.trim();
+    if (!limpio) return;
+    const match = listaPrecios.find((p) => p.codigo_barra === limpio);
+    if (match && inputStockProducto && !inputStockProducto.value) {
+      inputStockProducto.value = match.producto;
+      if (selectStockUnidad && match.unidad) selectStockUnidad.value = match.unidad;
+    }
   });
 
   // Eventos de Gestión de Comercios
@@ -1468,6 +2494,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Escape') {
       if (!modalAuthBackdrop?.classList.contains('hidden')) {
         cerrarModalAuth();
+      } else if (!modalStockBackdrop?.classList.contains('hidden')) {
+        cerrarModalStock();
       } else if (!modalComercioBackdrop?.classList.contains('hidden')) {
         cerrarModalComercio();
       } else if (!sheetBackdrop?.classList.contains('hidden')) {
@@ -1492,10 +2520,12 @@ document.addEventListener('DOMContentLoaded', () => {
     buscarAutocompletadoProducto(e.target.value);
   });
 
-  // Carga inicial, sesión anónima y Suscripciones Realtime
+  // Carga inicial, sesión y Suscripciones Realtime
   inicializarSesion().finally(() => {
     cargarComerciosIniciales();
     cargarPreciosIniciales();
+    cargarChangoInicial();
+    cargarStockInicial();
     suscribirRealtime();
   });
 });

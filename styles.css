@@ -935,17 +935,25 @@ body {
   border-radius: var(--radius-full);
   padding: 4px;
   gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.segmented-control::-webkit-scrollbar {
+  display: none;
 }
 
 .segment-tab {
-  flex: 1;
+  flex: 1 0 auto;
   min-height: 44px;
   height: 44px;
+  padding: 0 12px;
   border-radius: var(--radius-full);
   border: none;
   background: transparent;
   color: var(--text-muted);
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
   display: flex;
@@ -1709,6 +1717,380 @@ body {
   line-height: 1.4;
 }
 
+/* ==========================================================================
+   Vista 4: Mi Chango (Carrito de Supermercado y Control de Gasto)
+   ========================================================================== */
+.chango-summary-card {
+  background: linear-gradient(145deg, var(--bg-surface-elevated), var(--bg-surface));
+  border: 1px solid var(--border-highlight);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: var(--shadow-card);
+}
 
+.chango-summary-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
 
+.chango-summary-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
 
+.chango-total-amount {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--primary);
+  line-height: 1.15;
+  margin-top: 2px;
+}
+
+.chango-meta-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.chango-units-sub {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.chango-budget-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.chango-budget-label {
+  font-size: 0.84rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.chango-budget-input {
+  max-width: 150px;
+  min-height: 40px;
+  padding: 6px 12px;
+  font-size: 0.92rem;
+}
+
+.budget-progress-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.budget-progress-track {
+  width: 100%;
+  height: 8px;
+  background-color: var(--bg-body);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+}
+
+.budget-progress-bar {
+  height: 100%;
+  width: 0%;
+  background-color: var(--success);
+  border-radius: var(--radius-full);
+  transition: width 0.25s ease, background-color 0.25s ease;
+}
+
+.budget-progress-bar.warning {
+  background-color: var(--warning);
+}
+
+.budget-progress-bar.danger {
+  background-color: var(--danger);
+}
+
+.budget-progress-text {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.chango-actions-bar {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.chango-btn-add,
+.chango-btn-finish {
+  min-height: 44px;
+  padding: 10px 12px;
+  font-size: 0.88rem;
+}
+
+.chango-items-list,
+.stock-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chango-item-card,
+.stock-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: var(--shadow-card);
+}
+
+.chango-item-top,
+.stock-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.chango-item-title,
+.stock-card-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-main);
+  line-height: 1.3;
+}
+
+.chango-item-bottom,
+.stock-card-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.chango-price-edit-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.chango-subtotal {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.chango-unit-detail {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.btn-inline-edit {
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  color: var(--primary);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-inline-edit:hover {
+  background-color: var(--primary-subtle);
+}
+
+.stepper-control {
+  display: inline-flex;
+  align-items: center;
+  background-color: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  padding: 2px;
+  gap: 4px;
+}
+
+.stepper-btn {
+  min-width: 40px;
+  min-height: 40px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background-color: var(--bg-surface);
+  color: var(--text-main);
+  font-size: 1.15rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s ease;
+}
+
+.stepper-btn:hover,
+.stepper-btn:active {
+  background-color: var(--primary);
+  color: #04241E;
+}
+
+.stepper-val {
+  min-width: 34px;
+  text-align: center;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text-main);
+  padding: 0 4px;
+}
+
+.chango-form-extras {
+  background-color: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+  color: var(--text-main);
+  cursor: pointer;
+  min-height: 28px;
+}
+
+.checkbox-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.checkbox-sub {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.chango-extras-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* ==========================================================================
+   Vista 5: Stock Casa (Inventario del Hogar)
+   ========================================================================== */
+.stock-summary-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.stock-filter-pills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.stock-filter-pill {
+  min-height: 40px;
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-subtle);
+  background-color: var(--bg-surface);
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.stock-filter-pill.active {
+  background-color: var(--primary-subtle);
+  color: var(--primary);
+  border-color: var(--border-highlight);
+}
+
+.stock-card.low-stock {
+  border-color: rgba(245, 158, 11, 0.45);
+}
+
+.stock-card.out-stock {
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+.badge-categoria {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background-color: var(--bg-surface-elevated);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.badge-low-stock {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background-color: rgba(245, 158, 11, 0.16);
+  color: var(--warning);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.badge-out-stock {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background-color: rgba(239, 68, 68, 0.16);
+  color: var(--danger);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.stock-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-stock-to-chango {
+  min-height: 36px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-highlight);
+  background-color: var(--primary-subtle);
+  color: var(--primary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-stock-to-chango:hover {
+  background-color: var(--primary);
+  color: #04241E;
+}
