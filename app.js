@@ -2004,7 +2004,8 @@ function recuperarHistorialLocal() {
 }
 
 export async function cargarHistorialInicial() {
-  listaHistorial = recuperarHistorialLocal();
+  const localesPrevios = recuperarHistorialLocal();
+  listaHistorial = localesPrevios;
   if (vistaActual === 'chango') renderizarHistorial();
 
   if (!supabase || !usuarioActual) return;
@@ -2024,7 +2025,9 @@ export async function cargarHistorialInicial() {
 
     const { data, error } = await query;
     if (!error && data) {
-      listaHistorial = data;
+      // Conservar compras locales que aún no se hayan sincronizado
+      const pendientesLocales = localesPrevios.filter((h) => String(h.id).startsWith('local-'));
+      listaHistorial = [...pendientesLocales, ...data];
       guardarHistorialLocal();
       if (vistaActual === 'chango') renderizarHistorial();
     }
@@ -2035,7 +2038,10 @@ export async function cargarHistorialInicial() {
 
 export async function registrarCompraEnHistorial(itemsCompra, totalGastado) {
   const comerciosUnicos = [...new Set(itemsCompra.map((i) => i.comercio).filter(Boolean))];
-  const totalItems = itemsCompra.reduce((acc, i) => acc + Number(i.cantidad_chango || 1), 0);
+  const totalItems = itemsCompra.reduce((acc, i) => {
+    const cant = Number(i.cantidad_chango || 1);
+    return acc + (Number.isInteger(cant) ? cant : 1);
+  }, 0);
 
   const snapshotItems = itemsCompra.map((i) => ({
     producto: i.producto,
@@ -2051,9 +2057,9 @@ export async function registrarCompraEnHistorial(itemsCompra, totalGastado) {
   const registro = {
     hogar_id: hogarActual?.id || null,
     added_by_name: obtenerNombreUsuarioActual(),
-    comercios: comerciosUnicos,
+    comercios: (comerciosUnicos.join(', ') || 'Sin comercio').slice(0, 200),
     total_gastado: Number(totalGastado.toFixed(2)),
-    total_items: Number(totalItems.toFixed(3)),
+    total_items: Math.max(1, Math.round(totalItems)),
     items: snapshotItems
   };
 
@@ -2073,7 +2079,8 @@ export async function registrarCompraEnHistorial(itemsCompra, totalGastado) {
         return;
       }
     } catch (err) {
-      console.warn('Guardando historial localmente:', err);
+      console.error('Error guardando historial en Supabase:', err);
+      mostrarToast(`Aviso historial en nube: ${err.message || 'guardado local'}`, 'error');
     }
   }
 
@@ -2135,9 +2142,18 @@ export function renderizarHistorial() {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });
-    const comercios = Array.isArray(compra.comercios) && compra.comercios.length > 0
-      ? compra.comercios
-      : ['Sin comercio'];
+    let comercios = ['Sin comercio'];
+    if (Array.isArray(compra.comercios) && compra.comercios.length > 0) {
+      comercios = compra.comercios;
+    } else if (typeof compra.comercios === 'string' && compra.comercios.trim()) {
+      try {
+        const parsed = JSON.parse(compra.comercios);
+        comercios = Array.isArray(parsed) && parsed.length > 0 ? parsed : [compra.comercios];
+      } catch {
+        const parts = compra.comercios.split(',').map((s) => s.trim()).filter(Boolean);
+        if (parts.length > 0) comercios = parts;
+      }
+    }
     const items = Array.isArray(compra.items) ? compra.items : [];
 
     return `
