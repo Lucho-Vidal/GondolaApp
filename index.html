@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=12">
+  <link rel="stylesheet" href="styles.css?v=13">
   <title>ChangoCheck — Precios de Góndola</title>
 </head>
 <body>
@@ -254,8 +254,13 @@
       <!-- Historial de Compras -->
       <div class="historial-section" id="chango-historial-section">
         <div class="view-header">
-          <h2 class="view-title">🧾 Historial de Compras</h2>
-          <span class="count-badge" id="historial-count">0 compras</span>
+          <div class="view-header-title-wrap">
+            <h2 class="view-title">🧾 Historial de Compras</h2>
+            <span class="count-badge" id="historial-count">0 compras</span>
+          </div>
+          <button type="button" class="btn-action-small" id="btn-importar-ticket-chango" title="Importar ticket en PDF o foto">
+            📄 Importar Ticket PDF
+          </button>
         </div>
         <div class="historial-list" id="lista-historial"></div>
       </div>
@@ -277,9 +282,14 @@
             ⚠️ Por acabarse (<span id="stock-bajo-count">0</span>)
           </button>
         </div>
-        <button type="button" class="btn-action-small" id="btn-stock-agregar">
-          + Agregar
-        </button>
+        <div class="store-header-actions">
+          <button type="button" class="btn-action-small" id="btn-importar-ticket-stock" title="Cargar stock desde ticket PDF">
+            📄 Ticket PDF
+          </button>
+          <button type="button" class="btn-action-small" id="btn-stock-agregar">
+            + Agregar
+          </button>
+        </div>
       </div>
 
       <div class="view-header">
@@ -843,6 +853,104 @@
     </div>
   </div>
 
+  <!-- Modal para Importar Ticket PDF / Factura de Supermercado -->
+  <div class="sheet-backdrop hidden" id="modal-ticket-backdrop">
+    <div class="sheet-modal" id="modal-ticket" role="dialog" aria-modal="true" aria-labelledby="modal-ticket-title">
+      <div class="sheet-drag-handle"></div>
+      <div class="sheet-header">
+        <div class="sheet-title-wrap">
+          <h2 class="sheet-title" id="modal-ticket-title">📄 Importar Ticket de Compra</h2>
+          <p class="sheet-desc">Subí tu factura en PDF o foto para cargar Historial, Stock y Precios</p>
+        </div>
+        <button type="button" class="btn-sheet-close" id="btn-cerrar-modal-ticket" aria-label="Cerrar ventana">✕</button>
+      </div>
+      <div class="sheet-body">
+        <!-- Acceso rápido al ticket Carrefour recuperado -->
+        <div class="ticket-quick-recover" id="ticket-quick-recover-box">
+          <div class="ticket-quick-info">
+            <strong>⚡ Ticket Carrefour Adrogué (16/11/2026)</strong>
+            <span>29 productos · Total: $121.381,20 (Ahorro: $13.913,45)</span>
+          </div>
+          <button type="button" class="btn-action-small" id="btn-cargar-ticket-carrefour-precargado">
+            Cargar este ticket
+          </button>
+        </div>
+
+        <!-- Selector de archivo PDF / Imagen -->
+        <div class="ticket-upload-zone" id="ticket-upload-zone">
+          <input type="file" id="input-ticket-file" accept="application/pdf,.pdf,image/*,.txt" class="hidden">
+          <button type="button" class="btn-secondary btn-block" id="btn-seleccionar-archivo-ticket">
+            📂 Seleccionar PDF o Imagen de Ticket
+          </button>
+          <p class="ticket-upload-hint" id="ticket-upload-status">
+            Soporta Factura Electrónica PDF (Carrefour, Coto, etc.), fotos de tickets o texto.
+          </p>
+        </div>
+
+        <details class="ticket-manual-details">
+          <summary>📋 O pegar texto del ticket manualmente</summary>
+          <div class="ticket-manual-body">
+            <textarea
+              id="textarea-ticket-raw"
+              class="form-textarea"
+              rows="4"
+              placeholder="Pegá acá el texto copiado de tu factura o ticket..."
+            ></textarea>
+            <button type="button" class="btn-action-small" id="btn-parsear-texto-ticket">
+              Analizar texto pegado
+            </button>
+          </div>
+        </details>
+
+        <!-- Vista previa de ítems detectados -->
+        <div class="ticket-preview-wrap hidden" id="ticket-preview-wrap">
+          <div class="ticket-preview-summary">
+            <div class="form-row-split">
+              <div class="form-group">
+                <label for="input-ticket-comercio" class="form-label">Comercio detectado</label>
+                <input type="text" id="input-ticket-comercio" class="form-input" value="Carrefour">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Total Neto del Ticket</label>
+                <div class="ticket-total-badge" id="ticket-preview-total">$0,00</div>
+              </div>
+            </div>
+            <div class="ticket-preview-meta" id="ticket-preview-meta">0 productos detectados</div>
+          </div>
+
+          <div class="ticket-items-preview-list" id="ticket-items-preview-list"></div>
+
+          <div class="ticket-destinations-box">
+            <span class="form-label">¿Dónde querés impactar este ticket?</span>
+            <label class="checkbox-row">
+              <input type="checkbox" id="chk-ticket-historial" checked>
+              <span>🧾 Guardar compra en <strong>Historial de Compras</strong></span>
+            </label>
+            <label class="checkbox-row">
+              <input type="checkbox" id="chk-ticket-stock" checked>
+              <span>📦 Sumar productos a <strong>Stock en Casa</strong></span>
+            </label>
+            <label class="checkbox-row">
+              <input type="checkbox" id="chk-ticket-precios" checked>
+              <span>🏷️ Actualizar precios en <strong>Góndola / Comparador</strong></span>
+            </label>
+            <label class="checkbox-row">
+              <input type="checkbox" id="chk-ticket-chango">
+              <span>🛒 Cargar productos en <strong>Mi Chango actual</strong></span>
+            </label>
+          </div>
+
+          <div class="modal-actions-row">
+            <button type="button" class="btn-secondary" id="btn-cancelar-ticket">Cancelar</button>
+            <button type="button" class="btn-primary" id="btn-confirmar-importar-ticket">
+              🚀 Importar Todo
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast de Notificaciones -->
   <div class="toast hidden" id="toast" role="alert" aria-live="assertive"></div>
 
@@ -853,7 +961,7 @@
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=12')
+        navigator.serviceWorker.register('./sw.js?v=13')
           .then((reg) => {
             reg.update();
             console.log('SW registrado:', reg.scope);
@@ -864,6 +972,6 @@
   </script>
 
   <!-- Lógica Principal -->
-  <script type="module" src="app.js?v=12"></script>
+  <script type="module" src="app.js?v=13"></script>
 </body>
 </html>

@@ -2332,3 +2332,182 @@ body {
   white-space: nowrap;
 }
 
+/* ==========================================================================
+   Importador de Tickets PDF / Factura Electrónica
+   ========================================================================== */
+.ticket-quick-recover {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background-color: var(--primary-subtle);
+  border: 1px solid var(--border-highlight);
+  border-radius: var(--radius-md);
+}
+
+.ticket-quick-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.82rem;
+}
+
+.ticket-quick-info strong {
+  color: var(--text-main);
+  font-size: 0.88rem;
+}
+
+.ticket-quick-info span {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+}
+
+.ticket-upload-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  background-color: var(--bg-surface-elevated);
+  border: 1px dashed var(--border-highlight);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+.ticket-upload-hint {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.ticket-manual-details {
+  background-color: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+}
+
+.ticket-manual-details summary {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--primary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.ticket-manual-body {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ticket-preview-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 14px;
+}
+
+.ticket-preview-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ticket-total-badge {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--primary-subtle);
+  border: 1px solid var(--border-highlight);
+  border-radius: var(--radius-md);
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--primary);
+}
+
+.ticket-preview-meta {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.ticket-items-preview-list {
+  max-height: 240px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  background-color: var(--bg-body);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.ticket-item-preview-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+}
+
+.ticket-item-preview-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.ticket-item-preview-left input[type="checkbox"] {
+  margin-top: 3px;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+  flex-shrink: 0;
+}
+
+.ticket-item-preview-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ticket-item-preview-title {
+  font-weight: 600;
+  color: var(--text-main);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ticket-item-preview-sub {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+
+.ticket-item-preview-price {
+  font-weight: 700;
+  color: var(--primary);
+  white-space: nowrap;
+}
+
+.ticket-destinations-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  background-color: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+

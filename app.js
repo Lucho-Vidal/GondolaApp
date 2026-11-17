@@ -2394,7 +2394,7 @@ export async function cargarStockInicial() {
   }
 }
 
-export async function sumarOActualizarEnStock({ codigo_barra = null, producto, cantidad, unidad = 'un' }) {
+export async function sumarOActualizarEnStock({ codigo_barra = null, producto, cantidad, unidad = 'un', categoria = 'General' }) {
   const prodNorm = producto.trim().toLowerCase();
   const existente = listaStock.find((s) =>
     (codigo_barra && s.codigo_barra && s.codigo_barra === codigo_barra) ||
@@ -2404,12 +2404,19 @@ export async function sumarOActualizarEnStock({ codigo_barra = null, producto, c
   if (existente) {
     const nuevaCant = Number((Number(existente.cantidad) + Number(cantidad)).toFixed(3));
     existente.cantidad = nuevaCant;
+    if (categoria && categoria !== 'General' && (!existente.categoria || existente.categoria === 'General')) {
+      existente.categoria = categoria;
+    }
     guardarStockLocal();
     if (supabase && usuarioActual && !String(existente.id).startsWith('local-')) {
       try {
         await supabase
           .from('stock_casa')
-          .update({ cantidad: nuevaCant, updated_at: new Date().toISOString() })
+          .update({
+            cantidad: nuevaCant,
+            categoria: existente.categoria || categoria || 'General',
+            updated_at: new Date().toISOString()
+          })
           .eq('id', existente.id);
       } catch (e) {}
     }
@@ -2422,7 +2429,7 @@ export async function sumarOActualizarEnStock({ codigo_barra = null, producto, c
     cantidad: Number(Number(cantidad).toFixed(3)),
     unidad,
     stock_minimo: 1,
-    categoria: 'General',
+    categoria: categoria || 'General',
     hogar_id: hogarActual?.id || null,
     added_by_name: obtenerNombreUsuarioActual()
   };
@@ -3084,6 +3091,550 @@ export function suscribirRealtimeHogar() {
 }
 
 /* ==========================================================================
+   Importador Automático de Tickets PDF / Fotos y Recuperación de Ticket
+   ========================================================================== */
+const modalTicketBackdrop = document.getElementById('modal-ticket-backdrop');
+const btnCerrarModalTicket = document.getElementById('btn-cerrar-modal-ticket');
+const btnCancelarTicket = document.getElementById('btn-cancelar-ticket');
+const btnImportarTicketChango = document.getElementById('btn-importar-ticket-chango');
+const btnImportarTicketStock = document.getElementById('btn-importar-ticket-stock');
+const btnCargarTicketCarrefourPrecargado = document.getElementById('btn-cargar-ticket-carrefour-precargado');
+const btnSeleccionarArchivoTicket = document.getElementById('btn-seleccionar-archivo-ticket');
+const inputTicketFile = document.getElementById('input-ticket-file');
+const ticketUploadStatus = document.getElementById('ticket-upload-status');
+const textareaTicketRaw = document.getElementById('textarea-ticket-raw');
+const btnParsearTextoTicket = document.getElementById('btn-parsear-texto-ticket');
+const ticketPreviewWrap = document.getElementById('ticket-preview-wrap');
+const inputTicketComercio = document.getElementById('input-ticket-comercio');
+const ticketPreviewTotal = document.getElementById('ticket-preview-total');
+const ticketPreviewMeta = document.getElementById('ticket-preview-meta');
+const ticketItemsPreviewList = document.getElementById('ticket-items-preview-list');
+const chkTicketHistorial = document.getElementById('chk-ticket-historial');
+const chkTicketStock = document.getElementById('chk-ticket-stock');
+const chkTicketPrecios = document.getElementById('chk-ticket-precios');
+const chkTicketChango = document.getElementById('chk-ticket-chango');
+const btnConfirmarImportarTicket = document.getElementById('btn-confirmar-importar-ticket');
+
+let ticketParseadoActual = null;
+
+// Ticket Carrefour Adrogué 16/11/2026 (Factura B Nro T. 00162830 - $121.381,20) pre-procesado
+export const TICKET_CARREFOUR_16_11_2026 = {
+  comercio: 'Carrefour',
+  fecha: '16/11/2026 21:51',
+  nroTicket: '00162830',
+  ahorroTotal: 13913.45,
+  totalNeto: 121381.20,
+  items: [
+    { codigo_barra: '7790742348302', producto: 'Leche Ent 3% Bienestar La Serenísima Sac 1L', cantidad_chango: 2, unidad_stock: 'un', cantidad_pack: 1, unidad_pack: 'l', precio_lista: 2225.00, descuento: 652.00, precio_unitario_neto: 1899.00, subtotal: 3798.00, categoria: 'Heladera', seleccionado: true },
+    { codigo_barra: '7798001562605', producto: 'Leche Descremada Larga Vida Cremigal Sac 1L', cantidad_chango: 2, unidad_stock: 'un', cantidad_pack: 1, unidad_pack: 'l', precio_lista: 1690.00, descuento: 0, precio_unitario_neto: 1690.00, subtotal: 3380.00, categoria: 'Alacena', seleccionado: true },
+    { codigo_barra: '7791620187662', producto: 'Mayonesa Dánica Doypack x 500 grs', cantidad_chango: 1, unidad_stock: 'un', cantidad_pack: 500, unidad_pack: 'g', precio_lista: 2159.00, descuento: 0, precio_unitario_neto: 2159.00, subtotal: 2159.00, categoria: 'Alacena', seleccionado: true },
+    { codigo_barra: '7613287149145', producto: 'Cacao en Polvo Nescao x 300 grs', cantidad_chango: 1, unidad_stock: 'un', cantidad_pack: 300, unidad_pack: 'g', precio_lista: 4399.00, descuento: 0, precio_unitario_neto: 4399.00, subtotal: 4399.00, categoria: 'Alacena', seleccionado: true },
+    { codigo_barra: '7791720017296', producto: 'Mermelada de Frutilla Light Carrefour', cantidad_chango: 1, unidad_stock: 'un', cantidad_pack: 390, unidad_pack: 'g', precio_lista: 3490.00, descuento: 240.00, precio_unitario_neto: 3250.00, subtotal: 3250.00, categoria: 'Alacena', seleccionado: true },
+    { codigo_barra: '7798083732378', producto: 'Mermelada Arándanos Carrefour Classic', cantidad_chango: 1, unidad_stock: 'un', cantidad_pack: 454, unidad_pack: 'g', precio_lista: 3490.00, descuento: 240.00, precio_unitario_neto: 3250.00, subtotal: 3250.00, categoria: 'Alacena', seleccionado: true },
+    { codigo_barra: '7798141714827', producto: 'Rebozador Carrefour Bolsa x 1 kg', cantidad_chango: 1, unidad_stock: 'un', cantidad_pack: 1, unidad_pack: 'kg', precio_lista: 2750.00, descuento: 200.00, precio_unitario_neto: 2550.00, subtotal: 2550.00, categoria: 'Alacena', seleccionado: true },
+    { codigo_barra: '7791720027721', producto: 'Tomate Perita Cubeteados Carrefour x 400 grs', cantidad_chango: 4, unidad_stock: 'un', cantidad_pack: 400, unidad_pack: 'g', precio_lista: 1350.00, descuento: 400.00, precio_unitario_neto: 1250.00, subtotal: 5000.00, categoria: 'Alacena', seleccionado: true },
+    { codigo_barra: '7798159714239', producto: 'Garrapiñada de Maní Carrefour Bolsa x 80 grs', cantidad_chango: 1, unidad_stock: 'un', cantidad_pack: 80, unidad_pack: 'g', precio_lista: 1250.00, descuento: 100.00, precio_unitario_neto: 1150.00, subtotal: 1150.00, categoria: 'Alacena', seleccionado: true },
+    { codigo_barra: '7791720038529', producto: 'Polvo para Hornear Carrefour Classic x 50 grs', cantidad_chango: 1, unidad_stock: 'un', cantidad_pack: 50, unidad_pack: 'g', precio_lista: 1450.00, descuento: 100.00, precio_unitario_neto: 1350.00, subtotal: 1350.00, categoria: 'Alacena', seleccionado: true },
+    { codigo_barra: '7791720025123', producto: 'Aceite de Girasol Alto Omega Carrefour 1.5 Lt', cantidad_chango: 2, unidad_stock: 'un', cantidad_pack: 1.5, unidad_pack: 'l', precio_lista: 5690.00, descuento: 1000.00, precio_unitario_neto: 5190.00, subtotal: 10380.00, categoria: 'Alacena', seleccionado: true },
+    { codigo_barra: '7798033333891', producto: 'Atún en Aceite Lomitos Carrefour Lata x 170 grs', cantidad_chango: 1, unidad_stock: 'un', cantidad_pack: 170, unidad_pack: 'g', precio_lista: 3290.00, descuento: 300.00, precio_unitario_neto: 2990.00, subtotal: 2990.00, categoria: 'Alacena', seleccionado: true },
+    { codigo_barra: '7791720035955', producto: 'Vinagre de Alcohol Bulnez 1 Lt', cantidad_chango: 1, unidad_stock: 'un', cantidad_pack: 1, unidad_pack: 'l', precio_lista: 1350.00, descuento: 0, precio_unitario_neto: 1350.00, subtotal: 1350.00, categoria: 'Alacena', seleccionado: true },
+    { codigo_barra: '2509690007200', producto: 'Roast Beef Novillo x Kg', cantidad_chango: 0.720, unidad_stock: 'kg', cantidad_pack: 1, unidad_pack: 'kg', precio_lista: 12990.00, descuento: 0, precio_unitario_neto: 12990.00, subtotal: 9352.80, categoria: 'Freezer', seleccionado: true },
+    { codigo_barra: '2505721006952', producto: 'Milanesa de Bola de Lomo Novillito x Kg', cantidad_chango: 0.695, unidad_stock: 'kg', cantidad_pack: 1, unidad_pack: 'kg', precio_lista: 19500.00, descuento: 0, precio_unitario_neto: 19500.00, subtotal: 13552.50, categoria: 'Freezer', seleccionado: true },
+    { codigo_barra: '2509249007309', producto: 'Hígado x Kg', cantidad_chango: 0.730, unidad_stock: 'kg', cantidad_pack: 1, unidad_pack: 'kg', precio_lista: 4600.00, descuento: 0, precio_unitario_neto: 4600.00, subtotal: 3358.00, categoria: 'Heladera', seleccionado: true },
+    { codigo_barra: '8124', producto: 'Papa Cepillada x Kg', cantidad_chango: 1.990, unidad_stock: 'kg', cantidad_pack: 1, unidad_pack: 'kg', precio_lista: 2999.00, descuento: 0, precio_unitario_neto: 2999.00, subtotal: 5968.01, categoria: 'Alacena', seleccionado: true },
+    { codigo_barra: '4291', producto: 'Zanahoria Huella Natural x Kg', cantidad_chango: 0.665, unidad_stock: 'kg', cantidad_pack: 1, unidad_pack: 'kg', precio_lista: 1999.00, descuento: 0, precio_unitario_neto: 1999.00, subtotal: 1329.34, categoria: 'Heladera', seleccionado: true },
+    { codigo_barra: '7794440003310', producto: 'Fibra Esponja Lisa Virulana x 1 uni', cantidad_chango: 1, unidad_stock: 'un', cantidad_pack: 1, unidad_pack: 'un', precio_lista: 900.00, descuento: 0, precio_unitario_neto: 900.00, subtotal: 900.00, categoria: 'Limpieza', seleccionado: true },
+    { codigo_barra: '7790065000512', producto: 'Papel Aluminio Carrefour Essential 28 cm', cantidad_chango: 1, unidad_stock: 'un', cantidad_pack: 1, unidad_pack: 'un', precio_lista: 3790.00, descuento: 0, precio_unitario_neto: 3790.00, subtotal: 3790.00, categoria: 'Alacena', seleccionado: true },
+    { codigo_barra: '7793344009206', producto: 'Rollo de Cocina Gigante Elegante x 200 paños', cantidad_chango: 1, unidad_stock: 'un', cantidad_pack: 1, unidad_pack: 'un', precio_lista: 1990.00, descuento: 0, precio_unitario_neto: 1990.00, subtotal: 1990.00, categoria: 'Limpieza', seleccionado: true },
+    { codigo_barra: '7791293047058', producto: 'Acondicionador Reconstrucción + Amino Dove x 200 ml', cantidad_chango: 1, unidad_stock: 'un', cantidad_pack: 200, unidad_pack: 'ml', precio_lista: 6619.00, descuento: 2647.60, precio_unitario_neto: 3971.40, subtotal: 3971.40, categoria: 'Perfumería', seleccionado: true },
+    { codigo_barra: '7506306241183', producto: 'Antitranspirante Aero Original Dove x 150 ml', cantidad_chango: 1, unidad_stock: 'un', cantidad_pack: 150, unidad_pack: 'ml', precio_lista: 6089.00, descuento: 0, precio_unitario_neto: 6089.00, subtotal: 6089.00, categoria: 'Perfumería', seleccionado: true },
+    { codigo_barra: '7896015527457', producto: 'Crema Dental con Flúor Parodontax x 90 g', cantidad_chango: 1, unidad_stock: 'un', cantidad_pack: 90, unidad_pack: 'g', precio_lista: 8290.00, descuento: 0, precio_unitario_neto: 8290.00, subtotal: 8290.00, categoria: 'Perfumería', seleccionado: true },
+    { codigo_barra: '7791293048826', producto: 'Jabón Líquido Rosas Francesas Repuesto Lux x 250 ml', cantidad_chango: 1, unidad_stock: 'un', cantidad_pack: 250, unidad_pack: 'ml', precio_lista: 3089.00, descuento: 772.25, precio_unitario_neto: 2316.75, subtotal: 2316.75, categoria: 'Perfumería', seleccionado: true },
+    { codigo_barra: '7791293047102', producto: 'Shampoo Reconstrucción + Amino Dove x 400 ml', cantidad_chango: 1, unidad_stock: 'un', cantidad_pack: 400, unidad_pack: 'ml', precio_lista: 11079.00, descuento: 4431.60, precio_unitario_neto: 6647.40, subtotal: 6647.40, categoria: 'Perfumería', seleccionado: true },
+    { codigo_barra: '7794640171420', producto: 'Tabletas Limpiadoras de Prótesis Corega', cantidad_chango: 1, unidad_stock: 'un', cantidad_pack: 1, unidad_pack: 'un', precio_lista: 9890.00, descuento: 2472.50, precio_unitario_neto: 7417.50, subtotal: 7417.50, categoria: 'Perfumería', seleccionado: true },
+    { codigo_barra: '7702003010774', producto: 'Apósitos de Tela Transpiel Curitas x 10', cantidad_chango: 1, unidad_stock: 'un', cantidad_pack: 10, unidad_pack: 'un', precio_lista: 1430.00, descuento: 357.50, precio_unitario_neto: 1072.50, subtotal: 1072.50, categoria: 'Perfumería', seleccionado: true },
+    { codigo_barra: '2633169000000', producto: 'Bolsa Camiseta Verde 45x55x17 Mic Oxobio', cantidad_chango: 3, unidad_stock: 'un', cantidad_pack: 1, unidad_pack: 'un', precio_lista: 110.00, descuento: 0, precio_unitario_neto: 110.00, subtotal: 330.00, categoria: 'Limpieza', seleccionado: false }
+  ]
+};
+
+export function abrirModalTicket() {
+  if (!modalTicketBackdrop) return;
+  modalTicketBackdrop.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+export function cerrarModalTicket() {
+  if (!modalTicketBackdrop) return;
+  modalTicketBackdrop.classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+export function cargarTicketCarrefourPrecargado() {
+  ticketParseadoActual = JSON.parse(JSON.stringify(TICKET_CARREFOUR_16_11_2026));
+  renderizarVistaPreviaTicket();
+  mostrarToast('Ticket de Carrefour (16/11) cargado en vista previa', 'success');
+}
+
+function extraerPackYUnidadDeNombre(nombre) {
+  const texto = String(nombre || '').toUpperCase();
+  const matchGr = texto.match(/X\s*(\d+(?:[.,]\d+)?)\s*(GRS|GR|G)\b/);
+  if (matchGr) return { cantidad_pack: parseFloat(matchGr[1].replace(',', '.')), unidad_pack: 'g' };
+
+  const matchKg = texto.match(/X\s*(\d+(?:[.,]\d+)?)\s*(KGS|KG)\b/);
+  if (matchKg) return { cantidad_pack: parseFloat(matchKg[1].replace(',', '.')), unidad_pack: 'kg' };
+
+  const matchMl = texto.match(/X\s*(\d+(?:[.,]\d+)?)\s*(ML|CC)\b/);
+  if (matchMl) return { cantidad_pack: parseFloat(matchMl[1].replace(',', '.')), unidad_pack: 'ml' };
+
+  const matchLt = texto.match(/(?:X\s*)?(\d+(?:[.,]\d+)?)\s*(LTS|LT|L)\b/);
+  if (matchLt) return { cantidad_pack: parseFloat(matchLt[1].replace(',', '.')), unidad_pack: 'l' };
+
+  return { cantidad_pack: 1, unidad_pack: 'un' };
+}
+
+function capitalizarProductoTicket(str) {
+  return String(str || '')
+    .toLowerCase()
+    .replace(/(?:^|\s)\S/g, (c) => c.toUpperCase());
+}
+
+export function parsearTextoTicket(textoRaw) {
+  const lineas = String(textoRaw || '')
+    .split(/\r?\n/)
+    .map((l) => l.trim().replace(/\s+/g, ' '))
+    .filter(Boolean);
+
+  let comercio = 'Carrefour';
+  const todoUpper = textoRaw.toUpperCase();
+  if (todoUpper.includes('COTO')) comercio = 'Coto';
+  else if (todoUpper.includes('CHANGOMAS') || todoUpper.includes('DORINKA')) comercio = 'ChangoMás';
+  else if (todoUpper.includes('DIA ARGENTINA')) comercio = 'Día';
+  else if (todoUpper.includes('JUMBO') || todoUpper.includes('CENCOSUD')) comercio = 'Jumbo';
+  else if (todoUpper.includes('CARREFOUR') || todoUpper.includes('INC SA') || todoUpper.includes('30-68731043-4')) comercio = 'Carrefour';
+
+  let categoriaActual = 'Alacena';
+  const items = [];
+  let ultimoNombreCandidato = '';
+
+  const mapaSecciones = {
+    'ALMACEN': 'Alacena',
+    'ALMACÉN': 'Alacena',
+    'LACTEOS': 'Heladera',
+    'LÁCTEOS': 'Heladera',
+    'CARNICERIA': 'Freezer',
+    'CARNICERÍA': 'Freezer',
+    'FRUTAS Y VERDURAS': 'Heladera',
+    'VERDULERIA': 'Heladera',
+    'HOGAR BAZAR': 'Limpieza',
+    'LIMPIEZA': 'Limpieza',
+    'PERFUMERIA': 'Perfumería',
+    'PERFUMERÍA': 'Perfumería',
+    'OTROS': 'General'
+  };
+
+  const regexPesable = /^(\d+)\s*[xX]\s*(\d+[.,]\d+)\s*[xX]\s*(\d+[.,]\d+)\s*(?:\([\d.,]+%\))?\s*(\d+[.,]\d+)$/;
+  const regexUnidades = /^(\d+(?:[.,]\d+)?)\s*[xX]\s*(\d+[.,]\d+)\s*(?:\([\d.,]+%\))?\s*(\d+[.,]\d+)$/;
+  const regexDescuento = /^(.+?)\s+(-\d+[.,]\d+)$/;
+  const regexBarcode = /^(\d{4,14})$/;
+
+  for (let i = 0; i < lineas.length; i++) {
+    const linea = lineas[i];
+    const upper = linea.toUpperCase();
+
+    if (
+      upper.startsWith('SUBTOTAL SIN DESCUENTOS') ||
+      upper === 'DESCUENTOS' ||
+      upper.startsWith('====') ||
+      upper.startsWith('TOTAL $') ||
+      upper.startsWith('REG.TRANSPARENCIA')
+    ) {
+      break;
+    }
+
+    if (mapaSecciones[upper]) {
+      categoriaActual = mapaSecciones[upper];
+      ultimoNombreCandidato = '';
+      continue;
+    }
+
+    const mPesable = linea.match(regexPesable);
+    if (mPesable && ultimoNombreCandidato) {
+      const peso = parseFloat(mPesable[2].replace(',', '.'));
+      const precioKg = parseFloat(mPesable[3].replace(',', '.'));
+      const subtotalBruto = parseFloat(mPesable[4].replace(',', '.'));
+      items.push({
+        codigo_barra: null,
+        producto: capitalizarProductoTicket(ultimoNombreCandidato),
+        cantidad_chango: Number(peso.toFixed(3)),
+        unidad_stock: 'kg',
+        cantidad_pack: 1,
+        unidad_pack: 'kg',
+        precio_lista: Number(precioKg.toFixed(2)),
+        descuento: 0,
+        precio_unitario_neto: Number(precioKg.toFixed(2)),
+        subtotal: Number(subtotalBruto.toFixed(2)),
+        categoria: categoriaActual,
+        seleccionado: true
+      });
+      ultimoNombreCandidato = '';
+      continue;
+    }
+
+    const mUnidades = linea.match(regexUnidades);
+    if (mUnidades && ultimoNombreCandidato) {
+      const cant = parseFloat(mUnidades[1].replace(',', '.'));
+      const precioUnit = parseFloat(mUnidades[2].replace(',', '.'));
+      const subtotalBruto = parseFloat(mUnidades[3].replace(',', '.'));
+      const { cantidad_pack, unidad_pack } = extraerPackYUnidadDeNombre(ultimoNombreCandidato);
+      const esBolsa = ultimoNombreCandidato.toUpperCase().includes('BOLSA CAMISETA');
+
+      items.push({
+        codigo_barra: null,
+        producto: capitalizarProductoTicket(ultimoNombreCandidato),
+        cantidad_chango: Number(cant.toFixed(3)),
+        unidad_stock: 'un',
+        cantidad_pack,
+        unidad_pack,
+        precio_lista: Number(precioUnit.toFixed(2)),
+        descuento: 0,
+        precio_unitario_neto: Number(precioUnit.toFixed(2)),
+        subtotal: Number(subtotalBruto.toFixed(2)),
+        categoria: categoriaActual,
+        seleccionado: !esBolsa
+      });
+      ultimoNombreCandidato = '';
+      continue;
+    }
+
+    const mDto = linea.match(regexDescuento);
+    if (mDto && items.length > 0) {
+      const montoDto = Math.abs(parseFloat(mDto[2].replace(',', '.')));
+      const ultimoItem = items[items.length - 1];
+      ultimoItem.descuento = Number((ultimoItem.descuento + montoDto).toFixed(2));
+      ultimoItem.subtotal = Number(Math.max(0.01, ultimoItem.subtotal - montoDto).toFixed(2));
+      if (ultimoItem.unidad_stock === 'un' && ultimoItem.cantidad_chango > 0) {
+        ultimoItem.precio_unitario_neto = Number((ultimoItem.subtotal / ultimoItem.cantidad_chango).toFixed(2));
+      }
+      continue;
+    }
+
+    const mCode = linea.match(regexBarcode);
+    if (mCode && items.length > 0 && !items[items.length - 1].codigo_barra) {
+      items[items.length - 1].codigo_barra = mCode[1];
+      continue;
+    }
+
+    if (
+      !upper.startsWith('---') &&
+      !upper.startsWith('FACTURA ') &&
+      !upper.startsWith('A CONSUMIDOR') &&
+      !upper.startsWith('P.V.') &&
+      !upper.startsWith('FECHA ') &&
+      !upper.startsWith('CAJA ') &&
+      !upper.startsWith('INC SA') &&
+      !upper.startsWith('IBCM') &&
+      !upper.startsWith('ORIENTACION') &&
+      !upper.startsWith('IVA RESPONSABLE') &&
+      linea.length >= 3
+    ) {
+      ultimoNombreCandidato = linea;
+    }
+  }
+
+  const totalNeto = items.reduce((acc, it) => acc + Number(it.subtotal), 0);
+  const ahorroTotal = items.reduce((acc, it) => acc + Number(it.descuento || 0), 0);
+
+  return {
+    comercio,
+    totalNeto: Number(totalNeto.toFixed(2)),
+    ahorroTotal: Number(ahorroTotal.toFixed(2)),
+    items
+  };
+}
+
+export function renderizarVistaPreviaTicket() {
+  if (!ticketParseadoActual || !ticketPreviewWrap || !ticketItemsPreviewList) return;
+
+  ticketPreviewWrap.classList.remove('hidden');
+  if (inputTicketComercio) inputTicketComercio.value = ticketParseadoActual.comercio || 'Carrefour';
+
+  const seleccionados = ticketParseadoActual.items.filter((i) => i.seleccionado);
+  const totalCalculado = ticketParseadoActual.items.reduce((acc, i) => acc + Number(i.subtotal || 0), 0);
+  const ahorro = Number(ticketParseadoActual.ahorroTotal || 0);
+
+  if (ticketPreviewTotal) {
+    ticketPreviewTotal.textContent = `$${totalCalculado.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+  if (ticketPreviewMeta) {
+    const ahorroTxt = ahorro > 0
+      ? ` · Ahorro en descuentos: $${ahorro.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
+      : '';
+    ticketPreviewMeta.textContent = `${seleccionados.length} de ${ticketParseadoActual.items.length} productos seleccionados para Stock${ahorroTxt}`;
+  }
+
+  ticketItemsPreviewList.innerHTML = ticketParseadoActual.items.map((item, idx) => {
+    const subFmt = Number(item.subtotal).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const dtoTag = item.descuento > 0
+      ? ` · Dto -$${Number(item.descuento).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
+      : '';
+    return `
+      <div class="ticket-item-preview-row">
+        <label class="ticket-item-preview-left">
+          <input type="checkbox" class="chk-ticket-item" data-idx="${idx}" ${item.seleccionado ? 'checked' : ''}>
+          <div class="ticket-item-preview-info">
+            <span class="ticket-item-preview-title">${escapeHTML(item.producto)}</span>
+            <span class="ticket-item-preview-sub">
+              ${item.cantidad_chango} ${item.unidad_stock} · ${escapeHTML(item.categoria)}${item.codigo_barra ? ` · #${escapeHTML(item.codigo_barra)}` : ''}${dtoTag}
+            </span>
+          </div>
+        </label>
+        <span class="ticket-item-preview-price">$${subFmt}</span>
+      </div>
+    `;
+  }).join('');
+
+  ticketItemsPreviewList.querySelectorAll('.chk-ticket-item').forEach((chk) => {
+    chk.addEventListener('change', (e) => {
+      const idx = Number(e.target.getAttribute('data-idx'));
+      if (ticketParseadoActual?.items[idx]) {
+        ticketParseadoActual.items[idx].seleccionado = e.target.checked;
+        renderizarVistaPreviaTicket();
+      }
+    });
+  });
+}
+
+async function cargarScriptDinamico(src) {
+  return new Promise((resolve, reject) => {
+    const existente = document.querySelector(`script[src="${src}"]`);
+    if (existente) {
+      resolve();
+      return;
+    }
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error(`No se pudo cargar ${src}`));
+    document.head.appendChild(s);
+  });
+}
+
+export async function procesarArchivoTicket(file) {
+  if (!file) return;
+  if (ticketUploadStatus) {
+    ticketUploadStatus.textContent = `⏳ Analizando "${file.name}"...`;
+  }
+
+  try {
+    let textoExtraido = '';
+    const nombreLower = file.name.toLowerCase();
+
+    if (file.type === 'text/plain' || nombreLower.endsWith('.txt')) {
+      textoExtraido = await file.text();
+    } else if (file.type === 'application/pdf' || nombreLower.endsWith('.pdf')) {
+      await cargarScriptDinamico('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+      const pdfjsLib = window['pdfjs-dist/build/pdf'] || window.pdfjsLib;
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      const paginasTexto = [];
+
+      for (let p = 1; p <= pdf.numPages; p++) {
+        const page = await pdf.getPage(p);
+        const textContent = await page.getTextContent();
+        const filasPorY = new Map();
+
+        textContent.items.forEach((item) => {
+          const str = (item.str || '').trim();
+          if (!str) return;
+          const yKey = Math.round(item.transform[5] / 3) * 3;
+          if (!filasPorY.has(yKey)) filasPorY.set(yKey, []);
+          filasPorY.get(yKey).push({ x: item.transform[4], str });
+        });
+
+        const yOrdenadas = [...filasPorY.keys()].sort((a, b) => b - a);
+        const lineasPagina = yOrdenadas.map((y) => {
+          const fila = filasPorY.get(y).sort((a, b) => a.x - b.x);
+          return fila.map((f) => f.str).join(' ');
+        });
+        paginasTexto.push(lineasPagina.join('\n'));
+      }
+
+      textoExtraido = paginasTexto.join('\n');
+
+      // Si el PDF es una imagen escaneada (sin capa de texto), usar OCR con Tesseract.js
+      if (textoExtraido.replace(/\s+/g, '').length < 40) {
+        if (ticketUploadStatus) {
+          ticketUploadStatus.textContent = '🔍 PDF escaneado detectado. Ejecutando OCR sobre el ticket...';
+        }
+        await cargarScriptDinamico('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js');
+        const page = await pdf.getPage(1);
+        const viewport = page.getViewport({ scale: 2.0 });
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext('2d');
+        await page.render({ canvasContext: ctx, viewport }).promise;
+        const { data: { text } } = await window.Tesseract.recognize(canvas, 'spa');
+        textoExtraido = text;
+      }
+    } else if (file.type.startsWith('image/')) {
+      if (ticketUploadStatus) {
+        ticketUploadStatus.textContent = '🔍 Leyendo imagen del ticket con OCR...';
+      }
+      await cargarScriptDinamico('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js');
+      const { data: { text } } = await window.Tesseract.recognize(file, 'spa');
+      textoExtraido = text;
+    }
+
+    if (textareaTicketRaw) textareaTicketRaw.value = textoExtraido;
+    const resultado = parsearTextoTicket(textoExtraido);
+
+    if (!resultado.items || resultado.items.length === 0) {
+      if (ticketUploadStatus) {
+        ticketUploadStatus.textContent = '⚠️ No se detectaron líneas con formato automático. Revisá el texto o usá el botón rápido de arriba.';
+      }
+      mostrarToast('No se detectaron productos automáticamente en ese archivo.', 'info');
+      return;
+    }
+
+    ticketParseadoActual = resultado;
+    renderizarVistaPreviaTicket();
+    if (ticketUploadStatus) {
+      ticketUploadStatus.textContent = `✅ ¡Listo! Se detectaron ${resultado.items.length} productos de ${resultado.comercio}.`;
+    }
+    mostrarToast(`Se detectaron ${resultado.items.length} productos del ticket`, 'success');
+  } catch (err) {
+    console.error('Error procesando ticket PDF:', err);
+    if (ticketUploadStatus) {
+      ticketUploadStatus.textContent = `❌ Error al leer el archivo: ${err.message}`;
+    }
+    mostrarToast(`No se pudo procesar el archivo: ${err.message}`, 'error');
+  }
+}
+
+export async function confirmarImportacionTicket() {
+  if (!ticketParseadoActual || !Array.isArray(ticketParseadoActual.items) || ticketParseadoActual.items.length === 0) {
+    mostrarToast('Primero cargá o seleccioná un ticket.', 'error');
+    return;
+  }
+
+  const comercio = inputTicketComercio?.value.trim() || ticketParseadoActual.comercio || 'Carrefour';
+  const guardarEnHistorial = Boolean(chkTicketHistorial?.checked);
+  const guardarEnStock = Boolean(chkTicketStock?.checked);
+  const guardarEnPrecios = Boolean(chkTicketPrecios?.checked);
+  const guardarEnChango = Boolean(chkTicketChango?.checked);
+
+  if (!guardarEnHistorial && !guardarEnStock && !guardarEnPrecios && !guardarEnChango) {
+    mostrarToast('Elegí al menos un destino donde importar.', 'error');
+    return;
+  }
+
+  if (btnConfirmarImportarTicket) {
+    btnConfirmarImportarTicket.disabled = true;
+    btnConfirmarImportarTicket.textContent = '⏳ Importando...';
+  }
+
+  try {
+    const todosLosItems = ticketParseadoActual.items;
+    const itemsSeleccionados = todosLosItems.filter((i) => i.seleccionado);
+    const totalTicket = todosLosItems.reduce((acc, i) => acc + Number(i.subtotal || 0), 0);
+
+    // 1. Guardar en Historial de Compras (incluye todo el ticket tal como se pagó)
+    if (guardarEnHistorial) {
+      const itemsParaHistorial = todosLosItems.map((it) => ({
+        producto: it.producto,
+        comercio,
+        codigo_barra: it.codigo_barra || null,
+        precio_total: Number((Number(it.subtotal) / Number(it.cantidad_chango || 1)).toFixed(2)),
+        cantidad_pack: Number(it.cantidad_pack || 1),
+        unidad: it.unidad_pack || 'un',
+        cantidad_chango: Number(it.cantidad_chango || 1),
+        subtotal: Number(it.subtotal)
+      }));
+      await registrarCompraEnHistorial(itemsParaHistorial, totalTicket);
+    }
+
+    // 2. Sumar productos seleccionados a Stock en Casa
+    if (guardarEnStock) {
+      for (const it of itemsSeleccionados) {
+        await sumarOActualizarEnStock({
+          codigo_barra: it.codigo_barra || null,
+          producto: it.producto,
+          cantidad: Number(it.cantidad_chango || 1),
+          unidad: it.unidad_stock || 'un',
+          categoria: it.categoria || 'General'
+        });
+      }
+    }
+
+    // 3. Registrar precios unitarios en Precios de Góndola (Comparador)
+    if (guardarEnPrecios) {
+      for (const it of itemsSeleccionados) {
+        const yaRegistradoIgual = listaPrecios.some(
+          (p) =>
+            p.comercio?.toLowerCase() === comercio.toLowerCase() &&
+            ((it.codigo_barra && p.codigo_barra === it.codigo_barra) ||
+              p.producto?.toLowerCase() === it.producto.toLowerCase()) &&
+            Math.abs(Number(p.precio_total) - Number(it.precio_unitario_neto)) < 1
+        );
+        if (!yaRegistradoIgual) {
+          try {
+            await registrarPrecioEnBase(
+              {
+                codigo_barra: it.codigo_barra || null,
+                comercio,
+                producto: it.producto,
+                precio_total: Number(it.precio_unitario_neto),
+                cantidad: Number(it.cantidad_pack || 1),
+                unidad: it.unidad_pack || 'un'
+              },
+              true
+            );
+          } catch (e) {
+            console.warn('Aviso al sincronizar precio individual:', e);
+          }
+        }
+      }
+    }
+
+    // 4. Opcional: Cargar en Mi Chango actual
+    if (guardarEnChango) {
+      for (const it of itemsSeleccionados) {
+        await agregarItemAlChango({
+          comercio,
+          codigo_barra: it.codigo_barra || null,
+          producto: it.producto,
+          precio_total: Number(it.precio_unitario_neto),
+          cantidad_pack: Number(it.cantidad_pack || 1),
+          unidad: it.unidad_pack || 'un',
+          cantidad_chango: Number(it.cantidad_chango || 1),
+          actualizarPrecio: false
+        });
+      }
+    }
+
+    renderizarDashboard();
+    renderizarChango();
+    renderizarStock();
+    cerrarModalTicket();
+    mostrarToast(
+      `¡Ticket de ${comercio} ($${totalTicket.toLocaleString('es-AR', { minimumFractionDigits: 2 })}) importado con éxito!`,
+      'success'
+    );
+  } catch (err) {
+    console.error('Error importando ticket:', err);
+    mostrarToast(`Error al importar: ${err.message}`, 'error');
+  } finally {
+    if (btnConfirmarImportarTicket) {
+      btnConfirmarImportarTicket.disabled = false;
+      btnConfirmarImportarTicket.textContent = '🚀 Importar Todo';
+    }
+  }
+}
+
+/* ==========================================================================
    Inicialización de Eventos del DOM
    ========================================================================== */
 document.addEventListener('DOMContentLoaded', () => {
@@ -3283,11 +3834,44 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target === modalComercioBackdrop) cerrarModalComercio();
   });
 
+  // Eventos Importador de Tickets PDF / Factura Electrónica
+  btnImportarTicketChango?.addEventListener('click', abrirModalTicket);
+  btnImportarTicketStock?.addEventListener('click', abrirModalTicket);
+  btnCerrarModalTicket?.addEventListener('click', cerrarModalTicket);
+  btnCancelarTicket?.addEventListener('click', cerrarModalTicket);
+  modalTicketBackdrop?.addEventListener('click', (e) => {
+    if (e.target === modalTicketBackdrop) cerrarModalTicket();
+  });
+  btnCargarTicketCarrefourPrecargado?.addEventListener('click', cargarTicketCarrefourPrecargado);
+  btnSeleccionarArchivoTicket?.addEventListener('click', () => inputTicketFile?.click());
+  inputTicketFile?.addEventListener('change', (e) => {
+    const file = e.target.files?.[0];
+    if (file) procesarArchivoTicket(file);
+  });
+  btnParsearTextoTicket?.addEventListener('click', () => {
+    const raw = textareaTicketRaw?.value.trim() || '';
+    if (!raw) {
+      mostrarToast('Pegá el texto del ticket primero.', 'info');
+      return;
+    }
+    const res = parsearTextoTicket(raw);
+    if (!res.items || res.items.length === 0) {
+      mostrarToast('No se detectaron productos en el texto pegado.', 'error');
+      return;
+    }
+    ticketParseadoActual = res;
+    renderizarVistaPreviaTicket();
+    mostrarToast(`Se detectaron ${res.items.length} productos`, 'success');
+  });
+  btnConfirmarImportarTicket?.addEventListener('click', confirmarImportacionTicket);
+
   // Cerrar con Escape
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       if (!modalAuthBackdrop?.classList.contains('hidden')) {
         cerrarModalAuth();
+      } else if (!modalTicketBackdrop?.classList.contains('hidden')) {
+        cerrarModalTicket();
       } else if (!modalHogarBackdrop?.classList.contains('hidden')) {
         cerrarModalHogar();
       } else if (!modalStockBackdrop?.classList.contains('hidden')) {
