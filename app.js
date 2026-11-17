@@ -2056,7 +2056,7 @@ export async function registrarCompraEnHistorial(itemsCompra, totalGastado) {
 
   const registro = {
     hogar_id: hogarActual?.id || null,
-    added_by_name: obtenerNombreUsuarioActual(),
+    added_by_name: (obtenerNombreUsuarioActual() || 'Usuario').slice(0, 80),
     comercios: (comerciosUnicos.join(', ') || 'Sin comercio').slice(0, 200),
     total_gastado: Number(totalGastado.toFixed(2)),
     total_items: Math.max(1, Math.round(totalItems)),
@@ -2076,11 +2076,18 @@ export async function registrarCompraEnHistorial(itemsCompra, totalGastado) {
         if (!yaExiste) listaHistorial.unshift(data[0]);
         guardarHistorialLocal();
         if (vistaActual === 'chango') renderizarHistorial();
-        return;
+        return { ok: true, id: data[0].id };
       }
     } catch (err) {
       console.error('Error guardando historial en Supabase:', err);
-      mostrarToast(`Aviso historial en nube: ${err.message || 'guardado local'}`, 'error');
+      listaHistorial.unshift({
+        ...registro,
+        id: 'local-' + Date.now(),
+        created_at: new Date().toISOString()
+      });
+      guardarHistorialLocal();
+      if (vistaActual === 'chango') renderizarHistorial();
+      return { ok: false, error: err?.message || String(err) };
     }
   }
 
@@ -2091,6 +2098,7 @@ export async function registrarCompraEnHistorial(itemsCompra, totalGastado) {
   });
   guardarHistorialLocal();
   if (vistaActual === 'chango') renderizarHistorial();
+  return { ok: false, error: !usuarioActual ? 'No hay sesión iniciada' : 'Sin conexión a Supabase' };
 }
 
 export async function eliminarCompraHistorial(id) {
@@ -3558,6 +3566,7 @@ export async function confirmarImportacionTicket() {
     const totalTicket = todosLosItems.reduce((acc, i) => acc + Number(i.subtotal || 0), 0);
 
     // 1. Guardar en Historial de Compras (incluye todo el ticket tal como se pagó)
+    let resHistorial = { ok: true };
     if (guardarEnHistorial) {
       const itemsParaHistorial = todosLosItems.map((it) => ({
         producto: it.producto,
@@ -3569,7 +3578,7 @@ export async function confirmarImportacionTicket() {
         cantidad_chango: Number(it.cantidad_chango || 1),
         subtotal: Number(it.subtotal)
       }));
-      await registrarCompraEnHistorial(itemsParaHistorial, totalTicket);
+      resHistorial = await registrarCompraEnHistorial(itemsParaHistorial, totalTicket);
     }
 
     // 2. Sumar productos seleccionados a Stock en Casa
@@ -3634,6 +3643,15 @@ export async function confirmarImportacionTicket() {
     renderizarDashboard();
     renderizarChango();
     renderizarStock();
+
+    if (guardarEnHistorial && !resHistorial.ok) {
+      if (ticketUploadStatus) {
+        ticketUploadStatus.textContent = `⚠️ Error al guardar historial en Supabase: ${resHistorial.error}`;
+      }
+      mostrarToast(`Historial no guardado en nube: ${resHistorial.error}`, 'error');
+      return;
+    }
+
     cerrarModalTicket();
     mostrarToast(
       `¡Ticket de ${comercio} ($${totalTicket.toLocaleString('es-AR', { minimumFractionDigits: 2 })}) importado con éxito!`,
