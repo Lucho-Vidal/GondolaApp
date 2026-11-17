@@ -1,4 +1,4 @@
-const CACHE_NAME = 'changocheck-shell-v11';
+const CACHE_NAME = 'changocheck-shell-v12';
 const STATIC_ASSETS = [
   './',
   './index.html',

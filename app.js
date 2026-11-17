@@ -97,12 +97,15 @@ export async function inicializarSesion() {
         await procesarInvitacionPendiente();
         await cargarHogarInicial();
         await cargarChangoInicial();
+        await cargarHistorialInicial();
         await cargarStockInicial();
         suscribirRealtimeHogar();
       } else if (event === 'SIGNED_OUT') {
         hogarActual = null;
         miembrosHogar = [];
+        listaHistorial = recuperarHistorialLocal();
         actualizarUIHogar();
+        if (vistaActual === 'chango') renderizarHistorial();
         suscribirRealtimeHogar();
       }
     });
@@ -321,6 +324,7 @@ export async function cerrarSesion() {
 export let listaPrecios = [];
 export let listaComercios = [];
 export let listaChango = [];
+export let listaHistorial = [];
 export let listaStock = [];
 export let hogarActual = null;
 export let miembrosHogar = [];
@@ -335,6 +339,7 @@ let toastTimeout = null;
 let realtimeChannelPrecios = null;
 let realtimeChannelComercios = null;
 let realtimeChannelChango = null;
+let realtimeChannelHistorial = null;
 let realtimeChannelStock = null;
 
 const LOCAL_STORAGE_KEY = 'changocheck_precios_cache';
@@ -342,6 +347,7 @@ const LOCAL_STORAGE_COMERCIOS = 'changocheck_comercios_list';
 const LOCAL_STORAGE_COMERCIO = 'changocheck_last_comercio';
 const LOCAL_STORAGE_CHANGO = 'changocheck_chango_cache';
 const LOCAL_STORAGE_CHANGO_BUDGET = 'changocheck_chango_budget';
+const LOCAL_STORAGE_HISTORIAL = 'changocheck_historial_cache';
 const LOCAL_STORAGE_STOCK = 'changocheck_stock_cache';
 const LOCAL_STORAGE_HOGAR = 'changocheck_hogar_cache';
 
@@ -418,6 +424,12 @@ const changoBudgetText = document.getElementById('chango-budget-text');
 const btnChangoAgregar = document.getElementById('btn-chango-agregar');
 const btnChangoFinalizar = document.getElementById('btn-chango-finalizar');
 const btnChangoVaciar = document.getElementById('btn-chango-vaciar');
+const btnChangoCambiarComercio = document.getElementById('btn-chango-cambiar-comercio');
+const changoCambiarComercioBar = document.getElementById('chango-cambiar-comercio-bar');
+const selectChangoNuevoComercio = document.getElementById('select-chango-nuevo-comercio');
+const btnAplicarComercioChango = document.getElementById('btn-aplicar-comercio-chango');
+const historialCount = document.getElementById('historial-count');
+const listaHistorialEl = document.getElementById('lista-historial');
 
 // Elementos Vista Stock Casa
 const btnStockFiltroTodos = document.getElementById('btn-stock-filtro-todos');
@@ -452,6 +464,7 @@ const btnHogarSalir = document.getElementById('btn-hogar-salir');
 // FAB y Modal Bottom Sheet de Precio
 const btnFabCarga = document.getElementById('btn-fab-carga');
 const sheetBackdrop = document.getElementById('sheet-backdrop');
+const sheetTitle = document.getElementById('sheet-title');
 const btnCerrarSheet = document.getElementById('btn-cerrar-sheet');
 
 // Escáner y Formulario de Precios
@@ -462,6 +475,7 @@ const btnCancelarEscaner = document.getElementById('btn-cancelar-escaner');
 const btnScanText = document.getElementById('btn-scan-text');
 
 const formPrecio = document.getElementById('form-precio');
+const inputChangoEditId = document.getElementById('chango-edit-id');
 const inputCodigo = document.getElementById('codigo-barra');
 const selectComercio = document.getElementById('select-comercio');
 const btnNuevoComercioForm = document.getElementById('btn-nuevo-comercio-form');
@@ -634,6 +648,9 @@ export function poblarSelectComercios(seleccionado = null) {
   });
 
   selectComercio.innerHTML = html;
+  if (selectChangoNuevoComercio) {
+    selectChangoNuevoComercio.innerHTML = html;
+  }
 }
 
 export function abrirModalComercio(comercioParaEditar = null) {
@@ -845,15 +862,23 @@ export function abrirModalCarga(iniciarCamara = false, opciones = {}) {
   if (!sheetBackdrop) return;
   sheetBackdrop.classList.remove('hidden');
 
-  poblarSelectComercios();
+  poblarSelectComercios(opciones.comercio || null);
 
-  const modoChango = Boolean(opciones.modoChango);
+  const changoEditId = opciones.changoEditId ? String(opciones.changoEditId) : '';
+  const modoChango = Boolean(opciones.modoChango) || Boolean(changoEditId);
+
+  if (inputChangoEditId) inputChangoEditId.value = changoEditId;
+  if (sheetTitle) {
+    sheetTitle.textContent = changoEditId ? 'Editar Producto del Chango' : 'Registrar Precio';
+  }
   if (checkAgregarChango) {
     checkAgregarChango.checked = modoChango;
     changoExtrasFields?.classList.toggle('hidden', !modoChango);
   }
   if (btnGuardarText) {
-    btnGuardarText.textContent = modoChango ? 'Agregar al Chango' : 'Guardar Precio';
+    btnGuardarText.textContent = changoEditId
+      ? 'Guardar Cambios'
+      : (modoChango ? 'Agregar al Chango' : 'Guardar Precio');
   }
   if (inputChangoUnidades) {
     inputChangoUnidades.value = opciones.unidadesChango || 1;
@@ -862,11 +887,19 @@ export function abrirModalCarga(iniciarCamara = false, opciones = {}) {
     checkActualizarPrecioGondola.checked = true;
   }
 
-  if (opciones.codigo_barra && inputCodigo) inputCodigo.value = opciones.codigo_barra;
-  if (opciones.producto && inputProducto) inputProducto.value = opciones.producto;
-  if (opciones.precio_total && inputPrecio) inputPrecio.value = opciones.precio_total;
-  if (opciones.cantidad && inputCantidad) inputCantidad.value = opciones.cantidad;
-  if (opciones.unidad && selectUnidad) selectUnidad.value = opciones.unidad;
+  if (changoEditId) {
+    if (inputCodigo) inputCodigo.value = opciones.codigo_barra || '';
+    if (inputProducto) inputProducto.value = opciones.producto || '';
+    if (inputPrecio) inputPrecio.value = opciones.precio_total ?? '';
+    if (inputCantidad) inputCantidad.value = opciones.cantidad || 1;
+    if (selectUnidad) selectUnidad.value = opciones.unidad || 'un';
+  } else {
+    if (opciones.codigo_barra && inputCodigo) inputCodigo.value = opciones.codigo_barra;
+    if (opciones.producto && inputProducto) inputProducto.value = opciones.producto;
+    if (opciones.precio_total && inputPrecio) inputPrecio.value = opciones.precio_total;
+    if (opciones.cantidad && inputCantidad) inputCantidad.value = opciones.cantidad;
+    if (opciones.unidad && selectUnidad) selectUnidad.value = opciones.unidad;
+  }
   actualizarPreviewUnitario();
 
   if (iniciarCamara) {
@@ -890,6 +923,8 @@ export async function cerrarModalCarga() {
   if (escanerActivo) {
     await detenerEscaner();
   }
+  if (inputChangoEditId) inputChangoEditId.value = '';
+  if (sheetTitle) sheetTitle.textContent = 'Registrar Precio';
   if (sheetBackdrop) {
     sheetBackdrop.classList.add('hidden');
   }
@@ -1036,6 +1071,7 @@ export async function registrarPrecioEnBase({ codigo_barra, comercio, producto, 
 export async function guardarPrecio(e) {
   e.preventDefault();
 
+  const changoEditId = inputChangoEditId?.value.trim() || '';
   const codigo = inputCodigo?.value.trim() || null;
   const comercio = selectComercio?.value;
   const producto = inputProducto?.value.trim();
@@ -1051,7 +1087,7 @@ export async function guardarPrecio(e) {
     return;
   }
 
-  if (!agregarAlChango && !usuarioActual) {
+  if (!changoEditId && !agregarAlChango && !usuarioActual) {
     mostrarToast('Iniciá sesión para registrar precios.', 'info');
     abrirModalAuth();
     return;
@@ -1060,7 +1096,18 @@ export async function guardarPrecio(e) {
   btnGuardar.disabled = true;
 
   try {
-    if (agregarAlChango) {
+    if (changoEditId) {
+      await actualizarItemChangoCompleto(changoEditId, {
+        comercio,
+        codigo_barra: codigo,
+        producto,
+        precio_total: Number(precioTotal.toFixed(2)),
+        cantidad_pack: Number(cantidad.toFixed(3)),
+        unidad,
+        cantidad_chango: unidadesChango,
+        actualizarPrecio: actualizarGondola
+      });
+    } else if (agregarAlChango) {
       await agregarItemAlChango({
         comercio,
         codigo_barra: codigo,
@@ -1087,6 +1134,7 @@ export async function guardarPrecio(e) {
       localStorage.setItem(LOCAL_STORAGE_COMERCIO, comercio);
     } catch (err) {}
 
+    if (inputChangoEditId) inputChangoEditId.value = '';
     if (inputCodigo) inputCodigo.value = '';
     if (inputProducto) inputProducto.value = '';
     if (inputPrecio) inputPrecio.value = '';
@@ -1769,47 +1817,136 @@ export async function actualizarCantidadChango(id, delta) {
   }
 }
 
-export async function editarPrecioItemChango(id) {
+export function abrirEdicionItemChango(id) {
   const item = listaChango.find((i) => String(i.id) === String(id));
   if (!item) return;
 
-  const entrada = prompt(`Nuevo precio para "${item.producto}" ($):`, item.precio_total);
-  if (entrada === null) return;
+  abrirModalCarga(false, {
+    modoChango: true,
+    changoEditId: item.id,
+    comercio: item.comercio,
+    codigo_barra: item.codigo_barra || '',
+    producto: item.producto || '',
+    precio_total: item.precio_total,
+    cantidad: item.cantidad_pack || 1,
+    unidad: item.unidad || 'un',
+    unidadesChango: item.cantidad_chango || 1
+  });
+}
 
-  const nuevoPrecio = parseFloat(entrada.replace(',', '.'));
-  if (isNaN(nuevoPrecio) || nuevoPrecio <= 0) {
-    mostrarToast('Ingresá un precio válido mayor a 0.', 'error');
-    return;
-  }
+export async function actualizarItemChangoCompleto(id, {
+  comercio,
+  codigo_barra = null,
+  producto,
+  precio_total,
+  cantidad_pack = 1,
+  unidad = 'un',
+  cantidad_chango = 1,
+  actualizarPrecio = true
+}) {
+  const index = listaChango.findIndex((item) => String(item.id) === String(id));
+  if (index < 0) return;
 
-  item.precio_total = Number(nuevoPrecio.toFixed(2));
+  const cambios = {
+    comercio,
+    codigo_barra: codigo_barra || null,
+    producto: producto.trim(),
+    precio_total: Number(Number(precio_total).toFixed(2)),
+    cantidad_pack: Number(Number(cantidad_pack).toFixed(3)),
+    unidad,
+    cantidad_chango: Number(Number(cantidad_chango).toFixed(3)),
+    updated_at: new Date().toISOString()
+  };
+
+  listaChango[index] = { ...listaChango[index], ...cambios };
   guardarChangoLocal();
-  renderizarChango();
+  if (vistaActual === 'chango') renderizarChango();
 
   if (supabase && usuarioActual && !String(id).startsWith('local-')) {
     try {
-      await supabase
+      const { error } = await supabase
         .from('chango_items')
-        .update({ precio_total: item.precio_total, updated_at: new Date().toISOString() })
+        .update(cambios)
         .eq('id', id);
+      if (error) throw error;
     } catch (e) {
-      console.warn('Error actualizando precio de chango en Supabase:', e);
+      console.warn('Error actualizando ítem de chango en Supabase:', e);
     }
   }
 
-  try {
-    await sincronizarPrecioDesdeChango({
-      codigo_barra: item.codigo_barra,
-      comercio: item.comercio,
-      producto: item.producto,
-      precio_total: item.precio_total,
-      cantidad: item.cantidad_pack || 1,
-      unidad: item.unidad || 'un'
-    });
-    mostrarToast('Precio del chango y base de góndola actualizados', 'success');
-  } catch (e) {
-    mostrarToast('Precio actualizado en el chango', 'success');
+  let precioActualizado = false;
+  if (actualizarPrecio) {
+    try {
+      precioActualizado = await sincronizarPrecioDesdeChango({
+        codigo_barra: cambios.codigo_barra,
+        comercio: cambios.comercio,
+        producto: cambios.producto,
+        precio_total: cambios.precio_total,
+        cantidad: cambios.cantidad_pack,
+        unidad: cambios.unidad
+      });
+    } catch (e) {
+      console.warn('No se pudo sincronizar precio en góndola:', e);
+    }
   }
+
+  mostrarToast(
+    precioActualizado
+      ? `"${cambios.producto}" actualizado en el chango y góndola`
+      : `"${cambios.producto}" actualizado en el chango`,
+    'success'
+  );
+}
+
+export async function cambiarComercioTodoElChango(nuevoComercio) {
+  const comercioLimpio = nuevoComercio?.trim();
+  if (!comercioLimpio) {
+    mostrarToast('Seleccioná un comercio válido.', 'error');
+    return;
+  }
+  if (listaChango.length === 0) {
+    mostrarToast('Tu chango está vacío.', 'info');
+    return;
+  }
+
+  const ahora = new Date().toISOString();
+  listaChango = listaChango.map((item) => ({
+    ...item,
+    comercio: comercioLimpio,
+    updated_at: ahora
+  }));
+
+  guardarChangoLocal();
+  try {
+    localStorage.setItem(LOCAL_STORAGE_COMERCIO, comercioLimpio);
+  } catch (e) {}
+
+  if (changoCambiarComercioBar) changoCambiarComercioBar.classList.add('hidden');
+  if (vistaActual === 'chango') renderizarChango();
+
+  if (supabase && usuarioActual) {
+    try {
+      let query = supabase
+        .from('chango_items')
+        .update({ comercio: comercioLimpio, updated_at: ahora });
+
+      if (hogarActual?.id) {
+        query = query.eq('hogar_id', hogarActual.id);
+      } else {
+        query = query.eq('user_id', usuarioActual.id).is('hogar_id', null);
+      }
+      const { error } = await query;
+      if (error) throw error;
+    } catch (e) {
+      console.warn('Error actualizando comercio del chango en Supabase:', e);
+    }
+  }
+
+  mostrarToast(`Comercio actualizado a "${comercioLimpio}" en todo el chango`, 'success');
+}
+
+export async function editarPrecioItemChango(id) {
+  abrirEdicionItemChango(id);
 }
 
 export async function eliminarItemChango(id) {
@@ -1848,6 +1985,207 @@ export async function vaciarChango(pedirConfirmacion = true) {
   if (pedirConfirmacion) mostrarToast('Chango vaciado', 'info');
 }
 
+/* ==========================================================================
+   Historial de Compras
+   ========================================================================== */
+function guardarHistorialLocal() {
+  try {
+    localStorage.setItem(LOCAL_STORAGE_HISTORIAL, JSON.stringify(listaHistorial));
+  } catch (e) {}
+}
+
+function recuperarHistorialLocal() {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_HISTORIAL);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+export async function cargarHistorialInicial() {
+  listaHistorial = recuperarHistorialLocal();
+  if (vistaActual === 'chango') renderizarHistorial();
+
+  if (!supabase || !usuarioActual) return;
+
+  try {
+    let query = supabase
+      .from('compras_historial')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (hogarActual?.id) {
+      query = query.eq('hogar_id', hogarActual.id);
+    } else {
+      query = query.eq('user_id', usuarioActual.id).is('hogar_id', null);
+    }
+
+    const { data, error } = await query;
+    if (!error && data) {
+      listaHistorial = data;
+      guardarHistorialLocal();
+      if (vistaActual === 'chango') renderizarHistorial();
+    }
+  } catch (err) {
+    console.warn('Aviso cargando historial desde Supabase (usando caché local):', err);
+  }
+}
+
+export async function registrarCompraEnHistorial(itemsCompra, totalGastado) {
+  const comerciosUnicos = [...new Set(itemsCompra.map((i) => i.comercio).filter(Boolean))];
+  const totalItems = itemsCompra.reduce((acc, i) => acc + Number(i.cantidad_chango || 1), 0);
+
+  const snapshotItems = itemsCompra.map((i) => ({
+    producto: i.producto,
+    comercio: i.comercio,
+    codigo_barra: i.codigo_barra || null,
+    precio_total: Number(i.precio_total),
+    cantidad_pack: Number(i.cantidad_pack || 1),
+    unidad: i.unidad || 'un',
+    cantidad_chango: Number(i.cantidad_chango || 1),
+    subtotal: Number((Number(i.precio_total) * Number(i.cantidad_chango || 1)).toFixed(2))
+  }));
+
+  const registro = {
+    hogar_id: hogarActual?.id || null,
+    added_by_name: obtenerNombreUsuarioActual(),
+    comercios: comerciosUnicos,
+    total_gastado: Number(totalGastado.toFixed(2)),
+    total_items: Number(totalItems.toFixed(3)),
+    items: snapshotItems
+  };
+
+  if (supabase && usuarioActual) {
+    try {
+      const { data, error } = await supabase
+        .from('compras_historial')
+        .insert([{ ...registro, user_id: usuarioActual.id }])
+        .select();
+
+      if (error) throw error;
+      if (data && data[0]) {
+        const yaExiste = listaHistorial.some((h) => String(h.id) === String(data[0].id));
+        if (!yaExiste) listaHistorial.unshift(data[0]);
+        guardarHistorialLocal();
+        if (vistaActual === 'chango') renderizarHistorial();
+        return;
+      }
+    } catch (err) {
+      console.warn('Guardando historial localmente:', err);
+    }
+  }
+
+  listaHistorial.unshift({
+    ...registro,
+    id: 'local-' + Date.now(),
+    created_at: new Date().toISOString()
+  });
+  guardarHistorialLocal();
+  if (vistaActual === 'chango') renderizarHistorial();
+}
+
+export async function eliminarCompraHistorial(id) {
+  if (!confirm('¿Eliminar esta compra del historial?')) return;
+
+  listaHistorial = listaHistorial.filter((h) => String(h.id) !== String(id));
+  guardarHistorialLocal();
+  if (vistaActual === 'chango') renderizarHistorial();
+
+  if (supabase && usuarioActual && !String(id).startsWith('local-')) {
+    try {
+      await supabase.from('compras_historial').delete().eq('id', id);
+    } catch (e) {
+      console.warn('Error eliminando compra del historial en Supabase:', e);
+    }
+  }
+  mostrarToast('Compra eliminada del historial', 'info');
+}
+
+export function renderizarHistorial() {
+  if (!listaHistorialEl) return;
+
+  if (historialCount) {
+    historialCount.textContent = `${listaHistorial.length} ${listaHistorial.length === 1 ? 'compra' : 'compras'}`;
+  }
+
+  if (listaHistorial.length === 0) {
+    listaHistorialEl.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">🧾</div>
+        <p class="empty-title">Aún no hay compras registradas</p>
+        <p class="empty-desc">Cuando presiones "Finalizar Compra", el ticket quedará guardado acá.</p>
+      </div>
+    `;
+    return;
+  }
+
+  listaHistorialEl.innerHTML = listaHistorial.map((compra) => {
+    const fecha = compra.created_at
+      ? new Date(compra.created_at).toLocaleString('es-AR', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+      : 'Recién';
+    const totalFmt = Number(compra.total_gastado || 0).toLocaleString('es-AR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+    const comercios = Array.isArray(compra.comercios) && compra.comercios.length > 0
+      ? compra.comercios
+      : ['Sin comercio'];
+    const items = Array.isArray(compra.items) ? compra.items : [];
+
+    return `
+      <article class="historial-card" data-historial-id="${compra.id}">
+        <div class="historial-header">
+          <div>
+            <div class="historial-date">${escapeHTML(fecha)}</div>
+            <div class="price-card-badges">
+              ${comercios.map((c) => `<span class="badge-comercio">${escapeHTML(c)}</span>`).join('')}
+              ${(hogarActual && compra.added_by_name) ? `<span class="badge-autor">👤 ${escapeHTML(compra.added_by_name)}</span>` : ''}
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.5rem;">
+            <span class="historial-total">$${totalFmt}</span>
+            <button type="button" class="btn-delete-item btn-historial-del" data-id="${compra.id}" title="Eliminar del historial">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <details class="historial-details">
+          <summary>Ver ${items.length} ${items.length === 1 ? 'producto' : 'productos'} (${compra.total_items || items.length} u.)</summary>
+          <div class="historial-items-list">
+            ${items.map((it) => {
+              const subFmt = Number(it.subtotal ?? (Number(it.precio_total) * Number(it.cantidad_chango || 1))).toLocaleString('es-AR', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+              });
+              return `
+                <div class="historial-item-row">
+                  <span>${escapeHTML(it.producto)} <span class="historial-item-sub">× ${it.cantidad_chango || 1} (${escapeHTML(it.comercio || '')})</span></span>
+                  <strong>$${subFmt}</strong>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </details>
+      </article>
+    `;
+  }).join('');
+
+  listaHistorialEl.querySelectorAll('.btn-historial-del').forEach((btn) => {
+    btn.addEventListener('click', () => eliminarCompraHistorial(btn.getAttribute('data-id')));
+  });
+}
+
 export async function finalizarCompraChango() {
   if (listaChango.length === 0) {
     mostrarToast('Tu chango está vacío.', 'info');
@@ -1858,12 +2196,15 @@ export async function finalizarCompraChango() {
   const totalFmt = totalGastado.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const pasarAStock = confirm(
-    `Total de la compra: $${totalFmt}\n\n¿Querés sumar estos ${listaChango.length} productos a tu Stock en Casa y vaciar el chango?`
+    `Total de la compra: $${totalFmt}\n\n¿Querés guardar el ticket en el Historial, sumar estos ${listaChango.length} productos a tu Stock en Casa y vaciar el chango?`
   );
 
   if (!pasarAStock) return;
 
-  for (const item of listaChango) {
+  const itemsSnapshot = [...listaChango];
+  await registrarCompraEnHistorial(itemsSnapshot, totalGastado);
+
+  for (const item of itemsSnapshot) {
     const sumaCantidad = item.unidad === 'un'
       ? Number(item.cantidad_chango)
       : Number((Number(item.cantidad_chango) * Number(item.cantidad_pack || 1)).toFixed(3));
@@ -1877,7 +2218,7 @@ export async function finalizarCompraChango() {
   }
 
   await vaciarChango(false);
-  mostrarToast(`¡Compra finalizada ($${totalFmt})! Productos sumados al Stock Casa.`, 'success');
+  mostrarToast(`¡Compra finalizada ($${totalFmt})! Guardada en Historial y Stock Casa.`, 'success');
 }
 
 export function renderizarChango() {
@@ -1940,6 +2281,7 @@ export function renderizarChango() {
         <p class="empty-desc">Tocá "+ Agregar al Chango" para escanear o cargar lo que vas poniendo en el carrito.</p>
       </div>
     `;
+    renderizarHistorial();
     return;
   }
 
@@ -1974,8 +2316,8 @@ export function renderizarChango() {
           </div>
 
           <div class="stock-card-actions">
-            <button type="button" class="btn-inline-edit btn-chango-edit-price" data-id="${item.id}" title="Corregir precio y actualizar góndola">
-              ✏️ Precio
+            <button type="button" class="btn-inline-edit btn-chango-edit-item" data-id="${item.id}" title="Editar producto, comercio o precio">
+              ✏️ Editar
             </button>
             <div class="stepper-control">
               <button type="button" class="stepper-btn btn-chango-dec" data-id="${item.id}" aria-label="Restar unidad">−</button>
@@ -1997,9 +2339,11 @@ export function renderizarChango() {
   contenedorChango.querySelectorAll('.btn-chango-del').forEach((btn) => {
     btn.addEventListener('click', () => eliminarItemChango(btn.getAttribute('data-id')));
   });
-  contenedorChango.querySelectorAll('.btn-chango-edit-price').forEach((btn) => {
-    btn.addEventListener('click', () => editarPrecioItemChango(btn.getAttribute('data-id')));
+  contenedorChango.querySelectorAll('.btn-chango-edit-item').forEach((btn) => {
+    btn.addEventListener('click', () => abrirEdicionItemChango(btn.getAttribute('data-id')));
   });
+
+  renderizarHistorial();
 }
 
 /* ==========================================================================
@@ -2553,6 +2897,7 @@ export async function crearHogar(e) {
     if (inputHogarNombre) inputHogarNombre.value = '';
     await cargarHogarInicial();
     await cargarChangoInicial();
+    await cargarHistorialInicial();
     await cargarStockInicial();
     suscribirRealtimeHogar();
     mostrarToast(`Hogar "${hogarActual.nombre}" creado. Código: ${hogarActual.codigo_invitacion}`, 'success');
@@ -2580,6 +2925,7 @@ export async function unirseAHogarPorCodigo(codigo) {
     if (inputHogarCodigo) inputHogarCodigo.value = '';
     await cargarHogarInicial();
     await cargarChangoInicial();
+    await cargarHistorialInicial();
     await cargarStockInicial();
     suscribirRealtimeHogar();
     mostrarToast(`¡Te uniste al hogar "${hogarActual.nombre}"!`, 'success');
@@ -2624,6 +2970,7 @@ export async function salirDelHogar() {
     miembrosHogar = [];
     actualizarUIHogar();
     await cargarChangoInicial();
+    await cargarHistorialInicial();
     await cargarStockInicial();
     suscribirRealtimeHogar();
     cerrarModalHogar();
@@ -2639,6 +2986,10 @@ export function suscribirRealtimeHogar() {
   if (realtimeChannelChango) {
     supabase.removeChannel(realtimeChannelChango);
     realtimeChannelChango = null;
+  }
+  if (realtimeChannelHistorial) {
+    supabase.removeChannel(realtimeChannelHistorial);
+    realtimeChannelHistorial = null;
   }
   if (realtimeChannelStock) {
     supabase.removeChannel(realtimeChannelStock);
@@ -2675,6 +3026,28 @@ export function suscribirRealtimeHogar() {
           listaChango = listaChango.filter((i) => String(i.id) !== String(payload.old.id));
           guardarChangoLocal();
           if (vistaActual === 'chango') renderizarChango();
+        }
+      }
+    )
+    .subscribe();
+
+  realtimeChannelHistorial = supabase
+    .channel(`historial:${hogarActual?.id || usuarioActual.id}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'compras_historial', filter: filtro },
+      (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const existe = listaHistorial.some((h) => String(h.id) === String(payload.new.id));
+          if (!existe) {
+            listaHistorial.unshift(payload.new);
+            guardarHistorialLocal();
+            if (vistaActual === 'chango') renderizarHistorial();
+          }
+        } else if (payload.eventType === 'DELETE') {
+          listaHistorial = listaHistorial.filter((h) => String(h.id) !== String(payload.old.id));
+          guardarHistorialLocal();
+          if (vistaActual === 'chango') renderizarHistorial();
         }
       }
     )
@@ -2787,6 +3160,17 @@ document.addEventListener('DOMContentLoaded', () => {
   btnChangoAgregar?.addEventListener('click', () => abrirModalCarga(false, { modoChango: true }));
   btnChangoFinalizar?.addEventListener('click', finalizarCompraChango);
   btnChangoVaciar?.addEventListener('click', () => vaciarChango(true));
+  btnChangoCambiarComercio?.addEventListener('click', () => {
+    if (!changoCambiarComercioBar) return;
+    const oculto = changoCambiarComercioBar.classList.toggle('hidden');
+    if (!oculto) {
+      poblarSelectComercios();
+      selectChangoNuevoComercio?.focus();
+    }
+  });
+  btnAplicarComercioChango?.addEventListener('click', () => {
+    cambiarComercioTodoElChango(selectChangoNuevoComercio?.value);
+  });
   inputChangoPresupuesto?.addEventListener('input', (e) => {
     const val = parseFloat(e.target.value);
     presupuestoChango = isNaN(val) || val <= 0 ? 0 : val;
@@ -2939,6 +3323,7 @@ document.addEventListener('DOMContentLoaded', () => {
     await procesarInvitacionPendiente();
     await cargarHogarInicial();
     cargarChangoInicial();
+    cargarHistorialInicial();
     cargarStockInicial();
     suscribirRealtime();
     suscribirRealtimeHogar();

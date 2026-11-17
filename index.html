@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=11">
+  <link rel="stylesheet" href="styles.css?v=12">
   <title>ChangoCheck — Precios de Góndola</title>
 </head>
 <body>
@@ -234,11 +234,31 @@
 
       <div class="view-header">
         <h2 class="view-title">Productos en el Chango</h2>
-        <button type="button" class="btn-text-action" id="btn-chango-vaciar" title="Vaciar chango">
-          🗑️ Vaciar
-        </button>
+        <div class="store-header-actions">
+          <button type="button" class="btn-text-action" id="btn-chango-cambiar-comercio" title="Cambiar comercio de todo el chango">
+            🏬 Comercio
+          </button>
+          <button type="button" class="btn-text-action" id="btn-chango-vaciar" title="Vaciar chango">
+            🗑️ Vaciar
+          </button>
+        </div>
       </div>
+
+      <div class="chango-bulk-store-bar hidden" id="chango-cambiar-comercio-bar">
+        <select id="select-chango-nuevo-comercio" class="form-select"></select>
+        <button type="button" class="btn-action-small" id="btn-aplicar-comercio-chango">Aplicar a todo</button>
+      </div>
+
       <div class="chango-items-list" id="lista-chango"></div>
+
+      <!-- Historial de Compras -->
+      <div class="historial-section" id="chango-historial-section">
+        <div class="view-header">
+          <h2 class="view-title">🧾 Historial de Compras</h2>
+          <span class="count-badge" id="historial-count">0 compras</span>
+        </div>
+        <div class="historial-list" id="lista-historial"></div>
+      </div>
     </section>
 
     <!-- Vista 5: Stock Casa (Inventario del Hogar) -->
@@ -322,6 +342,7 @@
         <form class="price-form" id="form-precio" autocomplete="off" novalidate>
           <div class="form-card-modal">
             <!-- Código de barras -->
+            <input type="hidden" id="chango-edit-id" value="">
             <div class="form-group">
               <label for="codigo-barra" class="form-label">Código de Barras</label>
               <div class="input-with-action">
@@ -832,7 +853,7 @@
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=11')
+        navigator.serviceWorker.register('./sw.js?v=12')
           .then((reg) => {
             reg.update();
             console.log('SW registrado:', reg.scope);
@@ -843,6 +864,6 @@
   </script>
 
   <!-- Lógica Principal -->
-  <script type="module" src="app.js?v=11"></script>
+  <script type="module" src="app.js?v=12"></script>
 </body>
 </html>
